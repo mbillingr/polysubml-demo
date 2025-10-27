@@ -2,7 +2,7 @@
 #![allow(unused_imports)]
 #![allow(unused_variables)]
 
-mod ast;
+pub mod ast;
 mod bound_pairs_set;
 mod codegen;
 mod core;
@@ -16,7 +16,7 @@ mod type_errors;
 mod typeck;
 mod unwindmap;
 
-use lasso::Rodeo;
+pub use lasso::Rodeo;
 
 use std::mem;
 
@@ -76,7 +76,7 @@ impl std::fmt::Display for CompilationResult {
 pub struct State {
     parser: ScriptParser,
     spans: SpanManager,
-    strings: lasso::Rodeo,
+    pub strings: lasso::Rodeo,
 
     checker: TypeckState,
     compiler: ModuleBuilder,
@@ -96,17 +96,24 @@ impl State {
         }
     }
 
-    fn process_sub(&mut self, source: &str) -> Result<String, SpannedError> {
+    pub fn parse(&mut self, source: &str) -> Result<Vec<ast::Statement>, SpannedError> {
         let span_maker = self.spans.add_source(source.to_owned());
         let mut ctx = ast::ParserContext {
             span_maker,
             strings: &mut self.strings,
         };
 
-        let ast = self
-            .parser
+        self.parser
             .parse(&mut ctx, source)
-            .map_err(|e| convert_parse_error(ctx.span_maker, e))?;
+            .map_err(|e| convert_parse_error(ctx.span_maker, e))
+    }
+
+    pub fn check(&mut self, ast: &[ast::Statement]) -> Result<(), SpannedError> {
+        self.checker.check_script(&mut self.strings, &ast)
+    }
+
+    fn process_sub(&mut self, source: &str) -> Result<String, SpannedError> {
+        let ast = self.parse(source)?;
         let _t = self.checker.check_script(&mut self.strings, &ast)?;
 
         let mut ctx = codegen::Context(&mut self.compiler, &self.strings);
@@ -125,5 +132,9 @@ impl State {
     pub fn reset(&mut self) {
         mem::swap(&mut self.checker, &mut TypeckState::new(&mut self.strings));
         mem::swap(&mut self.compiler, &mut ModuleBuilder::new());
+    }
+
+    pub fn err_to_str(&self, err: &SpannedError) -> String {
+        err.print(&self.spans)
     }
 }
