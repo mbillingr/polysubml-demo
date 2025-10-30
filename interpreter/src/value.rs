@@ -110,8 +110,8 @@ impl Value {
                 s.push('}');
                 s
             }
-            //Value::Func(_) => "<fun>".to_string(),
-            Value::Func(f) => format!("{:?}", f),
+            Value::Func(_) => "<fun>".to_string(),
+            //Value::Func(f) => format!("{:?}", f),
             Value::Builtin(_) => "<builtin function>".to_string(),
         }
     }

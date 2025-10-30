@@ -2,6 +2,7 @@ use crate::value::Value;
 use compiler_lib::ast::StringId;
 use compiler_lib::{Rodeo, ast};
 use std::borrow::Cow;
+use std::cell::{Cell, RefCell};
 use std::io::BufRead;
 use std::sync::Arc;
 
@@ -46,9 +47,13 @@ impl<'a> Context<'a> {
                 assign(pat, Cow::Owned(val), &mut self.state.env);
             }
             ast::Statement::LetRecDef(defs) => {
+                for (name, _) in defs {
+                    self.state.env = self.state.env.bind_placeholder(*name);
+                }                
+                
                 for (name, expr) in defs {
                     let val = self.eval(&expr.0);
-                    self.state.env = self.state.env.bind(*name, val);
+                    self.state.env.set_placeholder(*name, val);
                 }
             }
             ast::Statement::Println(exprs) => {
@@ -179,7 +184,7 @@ impl<'a> Context<'a> {
 
             ast::Expr::Typed(tx) => self.eval(&tx.expr.0),
 
-            ast::Expr::Variable(var) => self.state.env.lookup(var.name).unwrap().clone(),
+            ast::Expr::Variable(var) => self.state.env.lookup(var.name).unwrap(),
         }
     }
 }
@@ -232,6 +237,7 @@ fn assign(pat: &ast::LetPattern, val: Cow<Value>, env: &mut Env) {
 pub enum Env {
     Empty,
     Entry(Arc<(StringId, Value, Env)>),
+    Lazy(Arc<(StringId, RefCell<Option<Value>>, Env)>)
 }
 
 impl Env {
@@ -257,15 +263,60 @@ impl Env {
         Env::Entry(Arc::new((name, value, self.clone())))
     }
 
-    fn lookup(&self, name: StringId) -> Option<&Value> {
+    fn lookup(&self, name: StringId) -> Option<Value> {
         let mut cursor = self;
-        while let Env::Entry(entry) = cursor {
-            let (n, v, c) = &**entry;
-            if *n == name {
-                return Some(v);
+        loop {
+            match cursor {
+                Env::Empty => return None,
+                Env::Entry(entry) => {
+                    let (n, v, c) = &**entry;
+                    if *n == name {
+                        return Some(v.clone());
+                    }
+                    cursor = c;
+                }
+                Env::Lazy(entry) => {
+                    let (n, cov, c) = &**entry;
+                    if *n == name {
+                        if let Some(v) = &*cov.borrow() {
+                            return Some(v.clone())
+                        } else {
+                            panic!("Uninitialized recursive value")
+                        }                        
+                    }
+                    cursor = c;
+                }
             }
-            cursor = c;
         }
-        None
+    }
+    
+    fn bind_placeholder(&self, name: StringId) -> Env {
+        Env::Lazy(Arc::new((name, RefCell::new(None), self.clone())))
+    }
+    
+    fn set_placeholder(&self, name: StringId, value: Value) {
+        let mut cursor = self;
+        loop {
+            match cursor {
+                Env::Empty => panic!("unbound name"),
+                Env::Entry(entry) => {
+                    let (n, v, c) = &**entry;
+                    if *n == name {
+                        panic!("immutable binding")
+                    }
+                    cursor = c;
+                }
+                Env::Lazy(entry) => {
+                    let (n, cov, c) = &**entry;
+                    if *n == name {
+                        if cov.borrow_mut().replace(value.clone()).is_some() {
+                            panic!("Placeholder assigned twice")
+                        }
+                        return
+                    }
+                    cursor = c;
+                }
+            }
+        }
     }
 }
