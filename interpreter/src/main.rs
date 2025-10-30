@@ -6,7 +6,9 @@ use std::io::Write;
 
 fn main() {
     let mut state = State::new();
-    let mut interpreter_state = interpreter::State::new();
+    state.add_builtins();
+
+    let mut interpreter_state = interpreter::State::with_builtins(&mut state.strings);
 
     let mut src = String::new();
     loop {

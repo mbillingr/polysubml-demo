@@ -7,7 +7,7 @@ use crate::ast::StringId;
 use crate::core::*;
 use crate::parse_types::TreeMaterializerState;
 use crate::parse_types::TypeParser;
-use crate::spans::SpannedError as SyntaxError;
+use crate::spans::{Span, SpanMaker, SpanManager, SpannedError as SyntaxError};
 use crate::type_errors::HoleSrc;
 use crate::unwindmap::UnwindMap;
 use crate::unwindmap::UnwindPoint;
@@ -84,6 +84,25 @@ impl TypeckState {
         new.bindings.make_permanent(n);
 
         new
+    }
+
+    pub fn add_builtins(&mut self, smgr: &mut SpanManager, strings: &mut lasso::Rodeo) {
+        let n = self.bindings.unwind_point();
+
+        let mut sm = smgr.add_source(
+            "
+read_lines : _ -> str
+        "
+            .to_string(),
+        );
+
+        let name = strings.get_or_intern_static("read_lines");
+        let arg = self.core.top_use();
+        let ret = self.core.new_val(VAbstract { ty: self.TY_STR }, sm.span(19, 22), None);
+        let fun = self.core.new_val(VFunc { arg, ret }, sm.span(14, 22), None);
+        self.bindings.vars.insert(name, fun);
+
+        self.bindings.make_permanent(n);
     }
 
     fn parse_type_signature(&mut self, tyexpr: &ast::STypeExpr) -> Result<(Value, Use)> {

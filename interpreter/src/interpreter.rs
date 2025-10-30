@@ -2,6 +2,7 @@ use crate::value::Value;
 use compiler_lib::ast::StringId;
 use compiler_lib::{Rodeo, ast};
 use std::borrow::Cow;
+use std::io::BufRead;
 use std::sync::Arc;
 
 pub struct Context<'a> {
@@ -15,7 +16,13 @@ pub struct State {
 
 impl State {
     pub fn new() -> Self {
-        State { env: Env::new() }
+        State { env: Env::Empty }
+    }
+
+    pub fn with_builtins(strings: &mut Rodeo) -> Self {
+        State {
+            env: Env::builtins(strings),
+        }
     }
 
     pub fn into_context<'a>(self, strings: &'a mut Rodeo) -> Context<'a> {
@@ -104,6 +111,7 @@ impl<'a> Context<'a> {
                         self.state.env = old_env;
                         result
                     }
+                    Value::Builtin(f) => f(arg),
                     _ => panic!("not callable: {:?}", func),
                 }
             }
@@ -229,6 +237,16 @@ pub enum Env {
 impl Env {
     fn new() -> Env {
         Env::Empty
+    }
+
+    fn builtins(strings: &mut Rodeo) -> Env {
+        let mut env = Env::Empty;
+
+        let name = strings.get_or_intern_static("read_lines");
+        let value = Value::builtin(|_| std::io::stdin().lock().lines().next().unwrap().map(Value::string).unwrap());
+        env = env.bind(name, value);
+
+        env
     }
 
     fn bind(&self, name: StringId, value: Value) -> Env {

@@ -96,6 +96,10 @@ impl State {
         }
     }
 
+    pub fn add_builtins(&mut self) {
+        self.checker.add_builtins(&mut self.spans, &mut self.strings)
+    }
+
     pub fn parse(&mut self, source: &str) -> Result<Vec<ast::Statement>, SpannedError> {
         let span_maker = self.spans.add_source(source.to_owned());
         let mut ctx = ast::ParserContext {
