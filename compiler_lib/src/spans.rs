@@ -102,6 +102,31 @@ impl SpanManager {
         self.spans.push((source_ind, l, r));
         Span(i)
     }
+    
+    pub fn add_marked_source(&mut self, source: &str) -> (SpanMaker<'_>, Vec<usize>) {
+        let mut unmarked = Vec::with_capacity(source.len());        
+        let mut markers = Vec::new();
+        
+        let mut bytes = source.bytes();        
+        while let Some(ch) = bytes.next() {
+            if ch != b'$' { unmarked.push(ch); continue }
+            
+            let mut num = 0;
+            loop {
+                let ch = bytes.next().unwrap();
+                if ch == b'$' { break }
+                assert!(ch.is_ascii_digit());
+                num = num * 10 + (ch - b'0') as usize;
+            }
+            if num >= markers.len() {
+                markers.resize(num + 1, 0);
+            }
+            assert_eq!(markers[num], 0, "duplicate marker");
+            markers[num] = unmarked.len();
+        }
+
+        (self.add_source(String::from_utf8(unmarked).unwrap()), markers)
+    }
 
     ////////////////////////////////////////////////////////////////////////////////////////////
     /// Printing functions

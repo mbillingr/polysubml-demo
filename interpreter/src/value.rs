@@ -1,4 +1,4 @@
-use crate::interpreter::Env;
+use crate::interpreter::{Context, Env};
 use compiler_lib::ast::StringId;
 use compiler_lib::{Rodeo, ast};
 use std::collections::HashMap;
@@ -15,7 +15,7 @@ pub enum Value {
     Record(Arc<RwLock<HashMap<StringId, Self>>>),
 
     Func(Arc<(ast::LetPattern, ast::Expr, Env)>),
-    Builtin(fn(Value) -> Value),
+    Builtin(fn(Value, &Context) -> Value),
 }
 
 impl Value {
@@ -62,7 +62,7 @@ impl Value {
         Value::Func(Arc::new((param, expr, env)))
     }
 
-    pub fn builtin(f: fn(Value) -> Value) -> Value {
+    pub fn builtin(f: fn(Value, ctx: &Context) -> Value) -> Value {
         Value::Builtin(f)
     }
 }
@@ -112,7 +112,7 @@ impl Value {
             }
             //Value::Func(_) => "<fun>".to_string(),
             Value::Func(f) => format!("{:?}", f),
-            Value::Builtin(f) => "<builtin function>".to_string(),
+            Value::Builtin(_) => "<builtin function>".to_string(),
         }
     }
 }

@@ -16,7 +16,7 @@ pub struct State {
 
 impl State {
     pub fn new() -> Self {
-        State { env: Env::Empty }
+        State { env: Env::new() }
     }
 
     pub fn with_builtins(strings: &mut Rodeo) -> Self {
@@ -111,7 +111,7 @@ impl<'a> Context<'a> {
                         self.state.env = old_env;
                         result
                     }
-                    Value::Builtin(f) => f(arg),
+                    Value::Builtin(f) => f(arg, self),
                     _ => panic!("not callable: {:?}", func),
                 }
             }
@@ -243,7 +243,11 @@ impl Env {
         let mut env = Env::Empty;
 
         let name = strings.get_or_intern_static("read_lines");
-        let value = Value::builtin(|_| std::io::stdin().lock().lines().next().unwrap().map(Value::string).unwrap());
+        let value = Value::builtin(|_, _| std::io::stdin().lock().lines().next().unwrap().map(Value::string).unwrap());
+        env = env.bind(name, value);
+
+        let name = strings.get_or_intern_static("panic");
+        let value = Value::builtin(|msg, ctx| panic!("{}", msg.show(ctx.strings)));
         env = env.bind(name, value);
 
         env
