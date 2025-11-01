@@ -110,6 +110,7 @@ pub enum Statement {
     LetDef(LetDefinition),
     LetRecDef(Vec<LetRecDefinition>),
     Println(Vec<SExpr>),
+    Import(Spanned<String>),
 }
 
 fn enumerate_tuple_fields<T, R>(

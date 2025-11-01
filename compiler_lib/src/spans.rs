@@ -102,19 +102,24 @@ impl SpanManager {
         self.spans.push((source_ind, l, r));
         Span(i)
     }
-    
+
     pub fn add_marked_source(&mut self, source: &str) -> (SpanMaker<'_>, Vec<usize>) {
-        let mut unmarked = Vec::with_capacity(source.len());        
+        let mut unmarked = Vec::with_capacity(source.len());
         let mut markers = Vec::new();
-        
-        let mut bytes = source.bytes();        
+
+        let mut bytes = source.bytes();
         while let Some(ch) = bytes.next() {
-            if ch != b'$' { unmarked.push(ch); continue }
-            
+            if ch != b'$' {
+                unmarked.push(ch);
+                continue;
+            }
+
             let mut num = 0;
             loop {
                 let ch = bytes.next().unwrap();
-                if ch == b'$' { break }
+                if ch == b'$' {
+                    break;
+                }
                 assert!(ch.is_ascii_digit());
                 num = num * 10 + (ch - b'0') as usize;
             }

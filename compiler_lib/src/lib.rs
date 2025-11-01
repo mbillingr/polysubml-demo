@@ -6,12 +6,12 @@ pub mod ast;
 mod bound_pairs_set;
 mod codegen;
 mod core;
-mod grammar;
+pub mod grammar;
 mod instantiate;
 mod js;
 mod parse_types;
 mod reachability;
-mod spans;
+pub mod spans;
 mod type_errors;
 mod typeck;
 mod unwindmap;
@@ -29,7 +29,7 @@ use self::spans::SpanManager;
 use self::spans::SpannedError;
 use self::typeck::TypeckState;
 
-fn convert_parse_error<T: std::fmt::Display>(
+pub fn convert_parse_error<T: std::fmt::Display>(
     mut sm: SpanMaker,
     e: ParseError<usize, T, (&'static str, spans::Span)>,
 ) -> SpannedError {
@@ -74,8 +74,8 @@ impl std::fmt::Display for CompilationResult {
 }
 
 pub struct State {
-    parser: ScriptParser,
-    spans: SpanManager,
+    pub parser: ScriptParser,
+    pub spans: SpanManager,
     pub strings: lasso::Rodeo,
 
     checker: TypeckState,

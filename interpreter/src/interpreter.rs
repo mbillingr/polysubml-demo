@@ -2,7 +2,7 @@ use crate::value::Value;
 use compiler_lib::ast::StringId;
 use compiler_lib::{Rodeo, ast};
 use std::borrow::Cow;
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::io::BufRead;
 use std::sync::Arc;
 
@@ -16,10 +16,6 @@ pub struct State {
 }
 
 impl State {
-    pub fn new() -> Self {
-        State { env: Env::new() }
-    }
-
     pub fn with_builtins(strings: &mut Rodeo) -> Self {
         State {
             env: Env::builtins(strings),
@@ -45,8 +41,8 @@ impl<'a> Context<'a> {
             ast::Statement::LetRecDef(defs) => {
                 for (name, _) in defs {
                     self.state.env = self.state.env.bind_placeholder(*name);
-                }                
-                
+                }
+
                 for (name, expr) in defs {
                     let val = self.eval(&expr.0);
                     self.state.env.set_placeholder(*name, val);
@@ -58,6 +54,7 @@ impl<'a> Context<'a> {
                 }
                 println!()
             }
+            ast::Statement::Import(_) => unimplemented!(),
         }
     }
 
@@ -233,7 +230,7 @@ fn assign(pat: &ast::LetPattern, val: Cow<Value>, env: &mut Env) {
 pub enum Env {
     Empty,
     Entry(Arc<(StringId, Value, Env)>),
-    Lazy(Arc<(StringId, RefCell<Option<Value>>, Env)>)
+    Lazy(Arc<(StringId, RefCell<Option<Value>>, Env)>),
 }
 
 impl Env {
@@ -242,7 +239,7 @@ impl Env {
     }
 
     fn builtins(strings: &mut Rodeo) -> Env {
-        let mut env = Env::Empty;
+        let mut env = Env::new();
 
         let name = strings.get_or_intern_static("read_lines");
         let value = Value::builtin(|_, _| std::io::stdin().lock().lines().next().unwrap().map(Value::string).unwrap());
@@ -275,28 +272,28 @@ impl Env {
                     let (n, cov, c) = &**entry;
                     if *n == name {
                         if let Some(v) = &*cov.borrow() {
-                            return Some(v.clone())
+                            return Some(v.clone());
                         } else {
                             panic!("Uninitialized recursive value")
-                        }                        
+                        }
                     }
                     cursor = c;
                 }
             }
         }
     }
-    
+
     fn bind_placeholder(&self, name: StringId) -> Env {
         Env::Lazy(Arc::new((name, RefCell::new(None), self.clone())))
     }
-    
+
     fn set_placeholder(&self, name: StringId, value: Value) {
         let mut cursor = self;
         loop {
             match cursor {
                 Env::Empty => panic!("unbound name"),
                 Env::Entry(entry) => {
-                    let (n, v, c) = &**entry;
+                    let (n, _, c) = &**entry;
                     if *n == name {
                         panic!("immutable binding")
                     }
@@ -308,7 +305,7 @@ impl Env {
                         if cov.borrow_mut().replace(value.clone()).is_some() {
                             panic!("Placeholder assigned twice")
                         }
-                        return
+                        return;
                     }
                     cursor = c;
                 }

@@ -5,7 +5,7 @@ This is a fork of PolySubML that adds the following features:
 * Builtin functions for reading from stdin (partially done)
 * Builtin functions for writing to stdout (todo)
 * Builtin functions for string manipulation (todo)
-* Module system (todo)
+* Module system
 
 PolySubML is an experimental ML-like programming language with the following features:
 

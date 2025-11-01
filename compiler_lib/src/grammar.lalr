@@ -507,8 +507,11 @@ Statement: ast::Statement = {
     <SNoSemiExpr> => ast::Statement::Expr(<>),
     "print" <SepListOpt<SCompareExpr, ",">> => ast::Statement::Println(<>),
     => ast::Statement::Empty,
+    "import" <Spanned<StringLiteral>> => ast::Statement::Import(<>),
 }
 
 pub Script = {
    <SepList<Statement, ";">>
 }
+
+pub Module = Expr;

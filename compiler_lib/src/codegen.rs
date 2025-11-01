@@ -361,6 +361,7 @@ fn compile_statement(ctx: &mut Context<'_>, exprs: &mut Vec<js::Expr>, stmt: &as
             let args = args.iter().map(|expr| compile(ctx, expr)).collect();
             exprs.push(js::println(args));
         }
+        Import(_) => unimplemented!(),
     }
 }
 

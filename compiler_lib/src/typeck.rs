@@ -93,7 +93,8 @@ impl TypeckState {
             "
 read_lines : $0$any -> $1$str$2$
 panic : $3$any -> never$4$
-        ");
+        ",
+        );
 
         let name = strings.get_or_intern_static("read_lines");
         let arg = self.core.top_use();
@@ -567,6 +568,7 @@ panic : $3$any -> never$4$
                     self.check_expr(strings, expr, self.core.top_use())?;
                 }
             }
+            Import((_, span)) => return Err(SyntaxError::new1("Unexpanded import", *span)),
         };
         Ok(())
     }
