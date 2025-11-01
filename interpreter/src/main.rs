@@ -30,10 +30,9 @@ fn main() {
             continue;
         }
 
-        let mut ctx = std::mem::replace(&mut interpreter_state, interpreter::State::new()).into_context(&mut state.strings);
+        let mut ctx = interpreter::Context::new(&mut interpreter_state, &mut state.strings);
         for stmt in ast {
             ctx.exec(&stmt);
         }
-        interpreter_state = ctx.into_state();
     }
 }

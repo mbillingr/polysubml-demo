@@ -7,7 +7,7 @@ use std::io::BufRead;
 use std::sync::Arc;
 
 pub struct Context<'a> {
-    state: State,
+    state: &'a mut State,
     strings: &'a mut Rodeo,
 }
 
@@ -25,15 +25,11 @@ impl State {
             env: Env::builtins(strings),
         }
     }
-
-    pub fn into_context<'a>(self, strings: &'a mut Rodeo) -> Context<'a> {
-        Context { state: self, strings }
-    }
 }
 
 impl<'a> Context<'a> {
-    pub fn into_state(self) -> State {
-        self.state
+    pub fn new(state: &'a mut State, strings: &'a mut Rodeo) -> Self {
+        Context { state, strings }
     }
 
     pub fn exec(&mut self, stmt: &ast::Statement) {
