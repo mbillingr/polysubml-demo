@@ -1,7 +1,7 @@
 This is a fork of PolySubML that adds the following features:
 
 * An ad-hoc interpreter written in Rust. This is likely less efficient than compilation to Javascript, 
-  but makes it easier for me to add teh other new features.
+  but makes it easier for me to add new runtime-related features.
 * Builtin functions for reading from stdin (partially done)
 * Builtin functions for writing to stdout (todo)
 * Builtin functions for string manipulation (todo)
