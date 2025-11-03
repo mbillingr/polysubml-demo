@@ -21,7 +21,10 @@ fn main() {
         src.clear();
         std::io::stdin().read_line(&mut src).unwrap();
 
+        let t0 = std::time::Instant::now();
+
         let prep = state.parse(&src);
+        let t1 = std::time::Instant::now();
         let prep = prep.and_then(|ast| {
             expand_imports(
                 ast,
@@ -31,7 +34,9 @@ fn main() {
                 &mut known_modules,
             )
         });
+        let t2 = std::time::Instant::now();
         let prep = prep.and_then(|ast| state.check(&ast).map(|_| ast));
+        let t3 = std::time::Instant::now();
 
         let ast = match prep {
             Ok(ast) => ast,
@@ -45,5 +50,13 @@ fn main() {
         for stmt in ast {
             ctx.exec(&stmt);
         }
+        let t4 = std::time::Instant::now();
+
+        let t_total = t4 - t0;
+        let t_parse = t1 - t0;
+        let t_expand = t2 - t1;
+        let t_check = t3 - t2;
+        let t_exec = t4 - t3;
+        eprintln!("{t_total:?} : (parse: {t_parse:?}, expand: {t_expand:?}, type-check: {t_check:?}, exec: {t_exec:?})");
     }
 }
