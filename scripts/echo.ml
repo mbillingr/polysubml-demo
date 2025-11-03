@@ -1,5 +1,4 @@
-loop
-    match read_line {} with
-      | `Ok line -> (print line; `Continue 0)
-      | `Eof _ -> `Break 0
-      | `Error e -> panic e
+import "libs/io.ml";
+import "libs/iter.ml";
+
+iter.for_each ((fun x -> (print x; {})), io.lines)
