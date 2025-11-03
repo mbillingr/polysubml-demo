@@ -17,7 +17,7 @@ pub enum Value {
     Record(Arc<RwLock<HashMap<StringId, Self>>>),
 
     Func(Arc<(ast::LetPattern, ast::Expr, Env)>),
-    Builtin(fn(Value, &Context) -> Value),
+    Builtin(Builtin),
 }
 
 impl Value {
@@ -64,8 +64,8 @@ impl Value {
         Value::Func(Arc::new((param, expr, env)))
     }
 
-    pub fn builtin(f: fn(Value, ctx: &Context) -> Value) -> Value {
-        Value::Builtin(f)
+    pub fn builtin(f: impl Fn(Value, &mut Context) -> Value + 'static) -> Value {
+        Value::Builtin(Builtin(Arc::new(f)))
     }
 }
 
@@ -182,5 +182,14 @@ impl std::cmp::PartialEq for Value {
             (Func(a), Func(b)) => Arc::ptr_eq(a, b),
             _ => false,
         }
+    }
+}
+
+#[derive(Clone)]
+pub struct Builtin(pub Arc<dyn Fn(Value, &mut Context) -> Value>);
+
+impl std::fmt::Debug for Builtin {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<builtin function>")
     }
 }

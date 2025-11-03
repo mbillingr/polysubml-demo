@@ -1,3 +1,4 @@
+use crate::value::Builtin;
 use crate::value::Value;
 use compiler_lib::ast::StringId;
 use compiler_lib::{Rodeo, ast};
@@ -109,7 +110,7 @@ impl<'a> Context<'a> {
                         self.state.env = old_env;
                         result
                     }
-                    Value::Builtin(f) => f(arg, self),
+                    Value::Builtin(Builtin(f)) => f(arg, self),
                     _ => panic!("not callable: {:?}", func),
                 }
             }
@@ -241,8 +242,25 @@ impl Env {
     fn builtins(strings: &mut Rodeo) -> Env {
         let mut env = Env::new();
 
-        let name = strings.get_or_intern_static("read_lines");
-        let value = Value::builtin(|_, _| std::io::stdin().lock().lines().next().unwrap().map(Value::string).unwrap());
+        let ok = strings.get_or_intern_static("Ok");
+        let err = strings.get_or_intern_static("Err");
+
+        let eof = Value::case(strings.get_or_intern_static("Eof"), Value::int(0.into()));
+
+        let name = strings.get_or_intern_static("read_line");
+        let value = Value::builtin(move |_, _| {
+            let mut s = String::new();
+            match std::io::stdin().lock().read_line(&mut s) {
+                Ok(0) => eof.clone(),
+                Ok(_) => {
+                    if s.ends_with('\n') {
+                        s.pop();
+                    }
+                    Value::case(ok, Value::string(s))
+                }
+                Err(e) => Value::case(err, Value::string(e.to_string())),
+            }
+        });
         env = env.bind(name, value);
 
         let name = strings.get_or_intern_static("panic");
