@@ -99,7 +99,7 @@ impl Value {
             Value::Bool(b) => b.to_string(),
             Value::Int(i) => i.to_string(),
             Value::Float(x) => x.to_string(),
-            Value::String(s) => (**s).clone(),
+            Value::String(s) => String::from_utf8(escape_bytes::unescape(s.bytes()).unwrap()).unwrap(),
             Value::Case(a) => format!("`{} {}", r.resolve(&a.0), a.1.show(r)),
             Value::Record(fields) => {
                 let mut s = String::new();
