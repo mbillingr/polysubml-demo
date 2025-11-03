@@ -1,8 +1,3 @@
-use std::cell::RefCell;
-use std::collections::HashMap;
-use std::rc::Rc;
-
-use crate::ast;
 use crate::ast::StringId;
 use crate::core::*;
 use crate::parse_types::TreeMaterializerState;
@@ -11,6 +6,11 @@ use crate::spans::{Span, SpanMaker, SpanManager, SpannedError as SyntaxError};
 use crate::type_errors::HoleSrc;
 use crate::unwindmap::UnwindMap;
 use crate::unwindmap::UnwindPoint;
+use crate::{ast, grammar};
+use lasso::Rodeo;
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::rc::Rc;
 
 use UTypeHead::*;
 use VTypeHead::*;
@@ -89,40 +89,20 @@ impl TypeckState {
     pub fn add_builtins(&mut self, smgr: &mut SpanManager, strings: &mut lasso::Rodeo) {
         let n = self.bindings.unwind_point();
 
-        let ok = strings.get_or_intern_static("Ok");
-        let err = strings.get_or_intern_static("Err");
-        let eof = strings.get_or_intern_static("Eof");
-
-        let (mut sm, m) = smgr.add_marked_source(
-            "
-read_lines : $0$any -> $1$[$2$`Ok $3$str$4$ | $5$`Eof $6$any$7$ | $8$`Err $9$str$10$]$11$
-panic : $12$any -> never$13$
-        ",
-        );
-
-        let name = strings.get_or_intern_static("read_line");
-        let arg = self.core.top_use();
-        let ret_ok_val = self.core.simple_val(self.TY_STR, sm.span(m[3], m[4]));
-        let ret_ok = self.core.new_val(VCase { case: (ok, ret_ok_val) }, sm.span(m[2], m[4]), None);
-        let ret_eof_val = self.core.new_val(VTop, sm.span(m[6], m[7]), None);
-        let ret_eof = self
-            .core
-            .new_val(VCase { case: (ok, ret_eof_val) }, sm.span(m[5], m[7]), None);
-        let ret_err_val = self.core.simple_val(self.TY_STR, sm.span(m[9], m[10]));
-        let ret_err = self
-            .core
-            .new_val(VCase { case: (ok, ret_err_val) }, sm.span(m[8], m[10]), None);
-        let ret = self.core.new_val(VUnion(vec![ret_ok]), sm.span(m[1], m[11]), None);
-        let fun = self.core.new_val(VFunc { arg, ret }, sm.span(m[0], m[11]), None);
-        self.bindings.vars.insert(name, fun);
-
-        let name = strings.get_or_intern_static("panic");
-        let arg = self.core.top_use();
-        let ret = self.core.bot();
-        let fun = self.core.new_val(VFunc { arg, ret }, sm.span(m[12], m[13]), None);
-        self.bindings.vars.insert(name, fun);
+        self.declare_builtin("panic", "any -> never", smgr, strings);
+        self.declare_builtin("read_line", "any -> [`Ok str | `Eof any | `Err str]", smgr, strings);
 
         self.bindings.make_permanent(n);
+    }
+
+    fn declare_builtin(&mut self, name: &'static str, ty_source: &str, smgr: &mut SpanManager, strings: &mut Rodeo) {
+        let span_maker = smgr.add_source(ty_source.to_owned());
+        let mut ctx = ast::ParserContext { span_maker, strings };
+        let tyexpr = grammar::STypeParser::new().parse(&mut ctx, ty_source).unwrap();
+
+        let (vty, _) = self.parse_type_signature(&tyexpr).unwrap();
+
+        self.bindings.vars.insert(strings.get_or_intern_static(name), vty);
     }
 
     fn parse_type_signature(&mut self, tyexpr: &ast::STypeExpr) -> Result<(Value, Use)> {

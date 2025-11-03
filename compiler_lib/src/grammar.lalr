@@ -156,7 +156,7 @@ Type = {
     FuncType,
     "rec" <Ident> "=" <Box<SType>> => ast::TypeExpr::RecursiveDef(<>),
 }
-SType = Spanned<Type>;
+pub SType = Spanned<Type>;
 
 
 
