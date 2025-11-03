@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 compiler_lib = { path = "../compiler_lib" }
 escape-bytes = "0.1.1"
+num-bigint = "0.4"

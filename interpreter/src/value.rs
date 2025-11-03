@@ -4,10 +4,12 @@ use compiler_lib::{Rodeo, ast};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
+type Int = num_bigint::BigInt;
+
 #[derive(Clone, Debug)]
 pub enum Value {
     Bool(bool),
-    Int(i64), // todo: bigint?
+    Int(Int),
     Float(f64),
     String(Arc<String>),
 
@@ -30,7 +32,7 @@ impl Value {
         }
     }
 
-    pub fn int(i: i64) -> Value {
+    pub fn int(i: Int) -> Value {
         Value::Int(i)
     }
 
