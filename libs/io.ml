@@ -5,8 +5,11 @@
        We just have to make sure we return no variant other than Some or None.
     *)
     lines = fun x ->
-        match read_line x with
+        match __read_line x with
             | `Err e -> panic e
             | `Eof _ -> `None {}
             | `Ok l -> `Some l
+
+    ; read_line = __read_line
+    ; write_str = __write_str
 }

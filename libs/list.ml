@@ -10,7 +10,7 @@ let rec is_empty =
     and cons = fun (type t u) (hd:t, tl:u) : [`Some t * u] ->
       `Some (hd, tl)
     
-    and head = fun (type t) (lst:[`Some t * any]) : t ->
+    and head = fun (type a) (lst : rec list = [`Some a * list | `None any]) : a ->
       match lst with
         | `None _ -> panic "empty list"
         | `Some (h, _) -> h
@@ -48,6 +48,28 @@ let rec is_empty =
        ys : rec list = [`Some a * list | `None any]
       ) : (rec list = [`Some a * list | `None any]) ->
       foldr (cons[t=a], ys, xs)
+
+    and reverse = fun (type a)
+      (xs : rec list = [`Some a * list | `None any]
+      ) : (rec list = [`Some a * list | `None any]) ->
+      foldl ((fun (rs, r) -> cons (r, rs)), nil, xs)
+
+    and collect_rev = fun (type a)
+      (it: any -> [`Some a | `None any]
+      ) : (rec list = [`Some a * list | `None any]) -> (
+      let vars = {mut out = nil};
+      loop
+        match it {} with
+          | `None _ -> `Break vars.out
+          | `Some x -> (
+                vars.out <- cons (x, vars.out);
+                `Continue {}
+          ))
+
+    and collect = fun (type a)
+      (it: any -> [`Some a | `None any]
+      ) : (rec list = [`Some a * list | `None any]) ->
+      reverse collect_rev it
 in {
-  nil; is_empty; cons; head; foldl; foldr; map; append
+  nil; is_empty; cons; head; foldl; foldr; map; append; reverse; collect_rev; collect
 }

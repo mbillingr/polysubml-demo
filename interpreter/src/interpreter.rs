@@ -249,7 +249,11 @@ impl Env {
         let eof_ = Value::case(strings.get_or_intern_static("Eof"), Value::int(0.into()));
         let none_ = Value::case(strings.get_or_intern_static("None"), Value::Nothing);
 
-        let name = strings.get_or_intern_static("read_line");
+        let name = strings.get_or_intern_static("panic");
+        let value = Value::builtin(|msg, ctx| panic!("{}", msg.show(ctx.strings)));
+        env = env.bind(name, value);
+
+        let name = strings.get_or_intern_static("__read_line");
         let eof = eof_.clone();
         let value = Value::builtin(move |_, _| {
             let mut s = String::new();
@@ -266,18 +270,14 @@ impl Env {
         });
         env = env.bind(name, value);
 
-        let name = strings.get_or_intern_static("write_str");
+        let name = strings.get_or_intern_static("__write_str");
         let value = Value::builtin(|s, _| {
             print!("{}", s.as_str());
             Value::Nothing
         });
         env = env.bind(name, value);
 
-        let name = strings.get_or_intern_static("panic");
-        let value = Value::builtin(|msg, ctx| panic!("{}", msg.show(ctx.strings)));
-        env = env.bind(name, value);
-
-        let name = strings.get_or_intern_static("chars");
+        let name = strings.get_or_intern_static("__chars");
         let none = none_.clone();
         let value = Value::builtin(move |s, _| {
             let none = none.clone();
@@ -289,7 +289,7 @@ impl Env {
         });
         env = env.bind(name, value);
 
-        let name = strings.get_or_intern_static("split");
+        let name = strings.get_or_intern_static("__split");
         let none = none_.clone();
         let value = Value::builtin(move |s, _| {
             let none = none.clone();
@@ -301,12 +301,12 @@ impl Env {
         });
         env = env.bind(name, value);
 
-        let name = strings.get_or_intern_static("escape");
+        let name = strings.get_or_intern_static("__escape");
         let value =
             Value::builtin(move |s, _| Value::string(String::from_utf8(escape_bytes::escape(s.as_str().bytes())).unwrap()));
         env = env.bind(name, value);
 
-        let name = strings.get_or_intern_static("unescape");
+        let name = strings.get_or_intern_static("__unescape");
         let value = Value::builtin(move |s, _| {
             Value::string(String::from_utf8(escape_bytes::unescape(s.as_str().bytes()).unwrap()).unwrap())
         });
