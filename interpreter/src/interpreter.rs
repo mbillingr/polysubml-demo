@@ -244,10 +244,13 @@ impl Env {
 
         let ok = strings.get_or_intern_static("Ok");
         let err = strings.get_or_intern_static("Err");
+        let some = strings.get_or_intern_static("Some");
 
-        let eof = Value::case(strings.get_or_intern_static("Eof"), Value::int(0.into()));
+        let eof_ = Value::case(strings.get_or_intern_static("Eof"), Value::int(0.into()));
+        let none_ = Value::case(strings.get_or_intern_static("None"), Value::Nothing);
 
         let name = strings.get_or_intern_static("read_line");
+        let eof = eof_.clone();
         let value = Value::builtin(move |_, _| {
             let mut s = String::new();
             match std::io::stdin().lock().read_line(&mut s) {
@@ -263,8 +266,50 @@ impl Env {
         });
         env = env.bind(name, value);
 
+        let name = strings.get_or_intern_static("write_str");
+        let value = Value::builtin(|s, _| {
+            print!("{}", s.as_str());
+            Value::Nothing
+        });
+        env = env.bind(name, value);
+
         let name = strings.get_or_intern_static("panic");
         let value = Value::builtin(|msg, ctx| panic!("{}", msg.show(ctx.strings)));
+        env = env.bind(name, value);
+
+        let name = strings.get_or_intern_static("chars");
+        let none = none_.clone();
+        let value = Value::builtin(move |s, _| {
+            let none = none.clone();
+            let mut chars = RefCell::new(s.as_str().chars().rev().collect::<Vec<_>>());
+            Value::builtin(move |_, _| match chars.borrow_mut().pop() {
+                None => none.clone(),
+                Some(ch) => Value::case(some, Value::string(ch.to_string())),
+            })
+        });
+        env = env.bind(name, value);
+
+        let name = strings.get_or_intern_static("split");
+        let none = none_.clone();
+        let value = Value::builtin(move |s, _| {
+            let none = none.clone();
+            let mut parts = RefCell::new(s.as_str().split_whitespace().rev().map(str::to_string).collect::<Vec<_>>());
+            Value::builtin(move |_, _| match parts.borrow_mut().pop() {
+                None => none.clone(),
+                Some(ch) => Value::case(some, Value::string(ch.to_string())),
+            })
+        });
+        env = env.bind(name, value);
+
+        let name = strings.get_or_intern_static("escape");
+        let value =
+            Value::builtin(move |s, _| Value::string(String::from_utf8(escape_bytes::escape(s.as_str().bytes())).unwrap()));
+        env = env.bind(name, value);
+
+        let name = strings.get_or_intern_static("unescape");
+        let value = Value::builtin(move |s, _| {
+            Value::string(String::from_utf8(escape_bytes::unescape(s.as_str().bytes()).unwrap()).unwrap())
+        });
         env = env.bind(name, value);
 
         env

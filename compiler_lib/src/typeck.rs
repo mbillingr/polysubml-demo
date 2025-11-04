@@ -91,6 +91,11 @@ impl TypeckState {
 
         self.declare_builtin("panic", "any -> never", smgr, strings);
         self.declare_builtin("read_line", "any -> [`Ok str | `Eof any | `Err str]", smgr, strings);
+        self.declare_builtin("write_str", "str -> {}", smgr, strings);
+        self.declare_builtin("chars", "str -> (any -> [`Some str | `None any])", smgr, strings);
+        self.declare_builtin("split", "str -> (any -> [`Some str | `None any])", smgr, strings);
+        self.declare_builtin("escape", "str -> str", smgr, strings);
+        self.declare_builtin("unescape", "str -> str", smgr, strings);
 
         self.bindings.make_permanent(n);
     }

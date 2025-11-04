@@ -8,6 +8,8 @@ type Int = num_bigint::BigInt;
 
 #[derive(Clone, Debug)]
 pub enum Value {
+    Nothing,
+
     Bool(bool),
     Int(Int),
     Float(f64),
@@ -50,6 +52,13 @@ impl Value {
 
     pub fn arc_str(s: Arc<String>) -> Value {
         Value::String(s)
+    }
+
+    pub fn as_str(&self) -> &str {
+        match self {
+            Value::String(s) => s.as_str(),
+            _ => unimplemented!(),
+        }
     }
 
     pub fn case(tag: StringId, val: Self) -> Value {
@@ -98,10 +107,11 @@ impl Value {
 impl Value {
     pub fn show(&self, r: &Rodeo) -> String {
         match self {
+            Value::Nothing => "()".to_string(),
             Value::Bool(b) => b.to_string(),
             Value::Int(i) => i.to_string(),
             Value::Float(x) => x.to_string(),
-            Value::String(s) => String::from_utf8(escape_bytes::unescape(s.bytes()).unwrap()).unwrap(),
+            Value::String(s) => format!("{s:?}"),
             Value::Case(a) => format!("`{} {}", r.resolve(&a.0), a.1.show(r)),
             Value::Record(fields) => {
                 let mut s = String::new();
