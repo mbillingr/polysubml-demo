@@ -43,6 +43,12 @@ let rec is_empty =
       ) : (rec list_b = [`Some b * list_b | `None any]) ->
       foldr ((fun (h, t) -> cons (f h, t)), nil, lst)
 
+    and filter = fun (type a)
+      (f : a->bool,
+       lst : rec list = [`Some a * list | `None any]
+      ) : (rec list = [`Some a * list | `None any]) ->
+      foldr ((fun (h, t) -> if f h then cons (h, t) else t), nil, lst)
+
     and append = fun (type a)
       (xs : rec list = [`Some a * list | `None any],
        ys : rec list = [`Some a * list | `None any]
@@ -71,5 +77,5 @@ let rec is_empty =
       ) : (rec list = [`Some a * list | `None any]) ->
       reverse collect_rev it
 in {
-  nil; is_empty; cons; head; foldl; foldr; map; append; reverse; collect_rev; collect
+  nil; is_empty; cons; head; foldl; foldr; map; filter; append; reverse; collect_rev; collect
 }
