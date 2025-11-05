@@ -2,7 +2,10 @@
     An iterator is a function that ignores its argument and returns the next value on each call.
     Any interesting use will need to keep mutable state in the iterator's closure.
 *)
-let rec range = fun (start: int, stop: int): (any -> [`Some int | `None any]) ->
+
+let type <<iter t>> = any -> [`Some t | `None any];
+
+let rec range = fun (start: int, stop: int): (<<iter int>>) ->
         let state = {mut x = start} in
             fun _ ->
                 if state.x >= stop then
@@ -10,39 +13,26 @@ let rec range = fun (start: int, stop: int): (any -> [`Some int | `None any]) ->
                 else
                     `Some (state.x <- state.x + 1)
 
-    and fold = fun (type a b)
-        (f : (b*a)->b
-        ,init : b
-        ,it : any -> [`Some a | `None any]
-        ) : b ->
+    and fold = fun (type a b) (f: (b*a)->b, init: b, it: <<iter a>>) : b ->
         let vars = {mut acc=init} in
             loop
                 match it {} with
                     | `None _ -> `Break vars.acc
                     | `Some x -> `Continue (vars.acc <- f(vars.acc, x))
 
-    and for_each = fun (type a)
-        (f : a -> any
-        ,it : any -> [`Some a | `None any]
-        ): any ->
+    and for_each = fun (type a) (f: a -> any, it: <<iter a>>): any ->
         loop
             match it {} with
                 | `None _ -> `Break {}
                 | `Some x -> `Continue (f x)
 
-    and map = fun (type a b)
-        (f : a -> b
-        ,it : any -> [`Some a | `None any]
-        ): (any -> [`Some b | `None any]) ->
+    and map = fun (type a b) (f: a -> b, it: <<iter a>>): (<<iter b>>) ->
         fun _ ->
             match it {} with
                 | `Some x -> `Some f x
                 | none -> none
 
-    and filter = fun (type a)
-        (f : a -> bool
-        ,it : any -> [`Some a | `None any]
-        ): (any -> [`Some a | `None any]) ->
+    and filter = fun (type a) (f: a -> bool, it: <<iter a>>): (<<iter a>>) ->
         fun z ->
             loop
                 match it {} with
@@ -52,10 +42,7 @@ let rec range = fun (start: int, stop: int): (any -> [`Some int | `None any]) ->
                             `Continue z)
                     | none -> `Break none
 
-    and skip = fun (type a)
-        (n: int
-        ,it : any -> [`Some a | `None any]
-        ) : (any -> [`Some a | `None any]) ->
+    and skip = fun (type a) (n: int, it: <<iter a>>) : (<<iter a>>) ->
         let state = {mut action=it; mut k=n} in
         let skipn = fun z ->
             loop
@@ -69,10 +56,7 @@ let rec range = fun (start: int, stop: int): (any -> [`Some int | `None any]) ->
             fun z -> state.action z
         )
 
-    and take = fun (type a)
-        (n: int
-        ,it : any -> [`Some a | `None any]
-        ) : (any -> [`Some a | `None any]) ->
+    and take = fun (type a) (n: int, it: <<iter a>>) : (<<iter a>>) ->
         let state = {mut k=n}
         in fun z ->
             if state.k > 0 then (
@@ -80,7 +64,6 @@ let rec range = fun (start: int, stop: int): (any -> [`Some int | `None any]) ->
                 it z)
             else
                 `None z
-
 
 in {
     range; fold; for_each; map; filter; skip; take
