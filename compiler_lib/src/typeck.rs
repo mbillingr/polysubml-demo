@@ -90,12 +90,21 @@ impl TypeckState {
         let n = self.bindings.unwind_point();
 
         self.declare_builtin("panic", "any -> never", smgr, strings);
+
         self.declare_builtin("__read_line", "any -> [`Ok str | `Eof any | `Err str]", smgr, strings);
         self.declare_builtin("__write_str", "str -> {}", smgr, strings);
+
         self.declare_builtin("__chars", "str -> (any -> [`Some str | `None any])", smgr, strings);
         self.declare_builtin("__split", "str -> (any -> [`Some str | `None any])", smgr, strings);
         self.declare_builtin("__escape", "str -> str", smgr, strings);
         self.declare_builtin("__unescape", "str -> str", smgr, strings);
+
+        self.declare_builtin("__int_to_float", "int -> float", smgr, strings);
+        self.declare_builtin("__float_to_int", "float -> int", smgr, strings);
+        self.declare_builtin("__str_to_int", "str -> [`Some int | `None any]", smgr, strings);
+        self.declare_builtin("__str_to_float", "str -> [`Some float | `None any]", smgr, strings);
+        self.declare_builtin("__int_to_str", "int -> str", smgr, strings);
+        self.declare_builtin("__float_to_str", "float -> str", smgr, strings);
 
         self.bindings.make_permanent(n);
     }

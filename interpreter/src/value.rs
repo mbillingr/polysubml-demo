@@ -38,8 +38,22 @@ impl Value {
         Value::Int(i)
     }
 
+    pub fn as_int(&self) -> &Int {
+        match self {
+            Value::Int(i) => i,
+            _ => unimplemented!(),
+        }
+    }
+
     pub fn float(f: f64) -> Value {
         Value::Float(f)
+    }
+
+    pub fn as_float(&self) -> f64 {
+        match self {
+            Value::Float(f) => *f,
+            _ => unimplemented!(),
+        }
     }
 
     pub fn str(s: &str) -> Value {

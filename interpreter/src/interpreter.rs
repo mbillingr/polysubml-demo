@@ -2,6 +2,7 @@ use crate::value::Builtin;
 use crate::value::Value;
 use compiler_lib::ast::StringId;
 use compiler_lib::{Rodeo, ast};
+use num::ToPrimitive;
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::io::BufRead;
@@ -312,6 +313,38 @@ impl Env {
             Value::string(String::from_utf8(escape_bytes::unescape(s.as_str().bytes()).unwrap()).unwrap())
         });
         env = env.bind(name, value);
+
+        let name = strings.get_or_intern_static("__int_to_float");
+        let vaue = Value::builtin(move |x, _| Value::float(x.as_int().to_f64().unwrap()));
+        env = env.bind(name, vaue);
+
+        let name = strings.get_or_intern_static("__float_to_int");
+        let vaue = Value::builtin(move |x, _| Value::int((x.as_float() as i64).into()));
+        env = env.bind(name, vaue);
+
+        let name = strings.get_or_intern_static("__str_to_int");
+        let none = none_.clone();
+        let vaue = Value::builtin(move |x, _| match x.as_str().parse::<_>() {
+            Ok(x) => Value::case(some, Value::int(x)),
+            Err(_) => none.clone(),
+        });
+        env = env.bind(name, vaue);
+
+        let name = strings.get_or_intern_static("__str_to_float");
+        let none = none_.clone();
+        let vaue = Value::builtin(move |x, _| match x.as_str().parse::<_>() {
+            Ok(x) => Value::case(some, Value::float(x)),
+            Err(_) => none.clone(),
+        });
+        env = env.bind(name, vaue);
+
+        let name = strings.get_or_intern_static("__int_to_str");
+        let vaue = Value::builtin(move |x, _| Value::string(x.as_int().to_string()));
+        env = env.bind(name, vaue);
+
+        let name = strings.get_or_intern_static("__float_to_str");
+        let vaue = Value::builtin(move |x, _| Value::string(x.as_float().to_string()));
+        env = env.bind(name, vaue);
 
         env
     }
