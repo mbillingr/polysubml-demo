@@ -100,6 +100,8 @@ pub enum TypeExpr {
     RecursiveDef(StringId, Box<STypeExpr>),
     Top,
     VarJoin(JoinKind, Vec<STypeExpr>),
+
+    TypeRef(((Spanned<StringId>, Vec<STypeExpr>), Span)),
 }
 pub type STypeExpr = Spanned<TypeExpr>;
 
@@ -110,7 +112,9 @@ pub enum Statement {
     LetDef(LetDefinition),
     LetRecDef(Vec<LetRecDefinition>),
     Println(Vec<SExpr>),
+
     Import(Spanned<String>),
+    TypeDef(((Vec<Spanned<StringId>>, TypeExpr), Span)),
 }
 
 fn enumerate_tuple_fields<T, R>(

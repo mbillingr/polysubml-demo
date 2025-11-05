@@ -155,6 +155,7 @@ Type = {
     NoFunType,
     FuncType,
     "rec" <Ident> "=" <Box<SType>> => ast::TypeExpr::RecursiveDef(<>),
+    <Spanned<("<<" <Spanned<Ident>> <SType*> ">>")>> => ast::TypeExpr::TypeRef(<>),
 }
 pub SType = Spanned<Type>;
 
@@ -450,6 +451,10 @@ LetRec: ast::Expr = {
      <lhs: LetRecLHS> <rhs: LetRHS> => ast::expr::block(vec![ast::Statement::LetRecDef(lhs)], rhs),
 }
 
+LetType = {
+    "let" "type" "<<" <Spanned<Ident>*> ">>" "=" <Type>,
+}
+
 LoopExpr: ast::Expr = {
     "loop" <Box<SNoSemiExpr>> => {
         ast::expr::loop_expr(<>)
@@ -508,10 +513,11 @@ Statement: ast::Statement = {
     "print" <SepListOpt<SCompareExpr, ",">> => ast::Statement::Println(<>),
     => ast::Statement::Empty,
     "import" <Spanned<StringLiteral>> => ast::Statement::Import(<>),
+    <Spanned<LetType>> => ast::Statement::TypeDef(<>),
 }
 
 pub Script = {
    <SepList<Statement, ";">>
 }
 
-pub Module = Expr;
+pub Module = Script;

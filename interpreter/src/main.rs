@@ -1,8 +1,10 @@
+mod expand;
 mod expand_imports;
+mod expand_types;
 mod interpreter;
 mod value;
 
-use crate::expand_imports::expand_imports;
+use crate::expand::expand_syntax;
 use compiler_lib::State;
 use compiler_lib::ast::StringId;
 use compiler_lib::spans::SpannedError;
@@ -56,13 +58,7 @@ fn exec(
     let ast = state.parse(&src)?;
 
     let t1 = std::time::Instant::now();
-    let ast = expand_imports(
-        ast,
-        std::env::current_dir().unwrap(),
-        &mut state.spans,
-        &mut state.strings,
-        known_modules,
-    )?;
+    let ast = expand_syntax(ast, &mut state.spans, &mut state.strings, known_modules)?;
 
     let t2 = std::time::Instant::now();
     state.check(&ast)?;

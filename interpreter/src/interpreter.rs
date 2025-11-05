@@ -56,6 +56,7 @@ impl<'a> Context<'a> {
                 println!()
             }
             ast::Statement::Import(_) => unimplemented!(),
+            ast::Statement::TypeDef(_) => unimplemented!(),
         }
     }
 
@@ -281,7 +282,7 @@ impl Env {
         let none = none_.clone();
         let value = Value::builtin(move |s, _| {
             let none = none.clone();
-            let mut chars = RefCell::new(s.as_str().chars().rev().collect::<Vec<_>>());
+            let chars = RefCell::new(s.as_str().chars().rev().collect::<Vec<_>>());
             Value::builtin(move |_, _| match chars.borrow_mut().pop() {
                 None => none.clone(),
                 Some(ch) => Value::case(some, Value::string(ch.to_string())),
@@ -293,7 +294,7 @@ impl Env {
         let none = none_.clone();
         let value = Value::builtin(move |s, _| {
             let none = none.clone();
-            let mut parts = RefCell::new(s.as_str().split_whitespace().rev().map(str::to_string).collect::<Vec<_>>());
+            let parts = RefCell::new(s.as_str().split_whitespace().rev().map(str::to_string).collect::<Vec<_>>());
             Value::builtin(move |_, _| match parts.borrow_mut().pop() {
                 None => none.clone(),
                 Some(ch) => Value::case(some, Value::string(ch.to_string())),

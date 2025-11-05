@@ -1,3 +1,4 @@
+use crate::expand::expand_syntax;
 use compiler_lib::grammar::ModuleParser;
 use compiler_lib::spans::{Span, SpanManager, SpannedError};
 use compiler_lib::{Rodeo, ast, convert_parse_error};
@@ -76,13 +77,27 @@ impl<'a> ImportExpansion<'a> {
                                 .map_err(|e| convert_parse_error(ctx.span_maker, e))?;
 
                             let old_path = std::mem::replace(&mut self.current_path, path.parent().unwrap().to_owned());
-                            let module_ast = self.expand_expr(module_ast)?;
+                            let mut module_ast = expand_syntax(module_ast, self.spans, self.strings, self.known_modules)?;
                             self.current_path = old_path;
 
                             let module_name = self.strings.get_or_intern(mod_name);
                             self.known_modules.insert(module_private_name, Some(module_name));
 
-                            self.module_defs.push(make_let(path_span, module_private_name, module_ast));
+                            let last_expr = match module_ast.pop() {
+                                Some(ast::Statement::Expr(expr)) => expr,
+                                _ => panic!("Module file must end with an expression"),
+                            };
+
+                            let module_expr = if module_ast.is_empty() {
+                                last_expr.0
+                            } else {
+                                ast::Expr::Block(ast::expr::BlockExpr {
+                                    statements: module_ast,
+                                    expr: Box::new(last_expr),
+                                })
+                            };
+
+                            self.module_defs.push(make_let(path_span, module_private_name, module_expr));
                             out.push(make_let(path_span, module_name, make_lookup(module_private_name)));
                         }
                     }
@@ -94,20 +109,6 @@ impl<'a> ImportExpansion<'a> {
             }
         }
         Ok(out)
-    }
-
-    fn expand_expr(&mut self, expr: ast::Expr) -> Result<ast::Expr, SpannedError> {
-        match expr {
-            ast::Expr::Block(blk) => {
-                let stmts = self.expand_stmts(blk.statements)?;
-                let expr = self.expand_expr(blk.expr.0)?;
-                Ok(ast::Expr::Block(ast::expr::BlockExpr {
-                    statements: stmts,
-                    expr: Box::new((expr, blk.expr.1)),
-                }))
-            }
-            _ => Ok(expr),
-        }
     }
 }
 

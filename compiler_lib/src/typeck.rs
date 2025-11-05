@@ -568,6 +568,7 @@ impl TypeckState {
                 }
             }
             Import((_, span)) => return Err(SyntaxError::new1("Unexpanded import", *span)),
+            TypeDef((_, span)) => return Err(SyntaxError::new1("Unexpanded type definition", *span)),
         };
         Ok(())
     }

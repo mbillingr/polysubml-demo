@@ -575,6 +575,8 @@ impl<'a> TypeParser<'a> {
             }
             Top => ParsedTypeHead::Top,
             &VarJoin(kind, ref children) => self.parse_union_or_intersect_type(&mut deps, kind, children)?,
+
+            TypeRef((_, span)) => return Err(SyntaxError::new1("Unexpanded type reference", *span)),
         };
         Ok(Rc::new((deps, span, head)))
     }
