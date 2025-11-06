@@ -80,6 +80,7 @@ impl Expandable for ast::TypeExpr {
                 let args = args.expand(ctx)?;
                 ctx.env.lookup_and_substitute(name, args)
             }
+            ast::TypeExpr::Container(tc, t) => t.expand(ctx).map(|t|ast::TypeExpr::Container(tc, t)),
         }
     }
 }
@@ -345,6 +346,7 @@ impl Substitutable for ast::TypeExpr {
             ast::TypeExpr::VarJoin(jk, tys) => Ok(ast::TypeExpr::VarJoin(*jk, tys.substitute(subs)?)),
 
             ast::TypeExpr::TypeRef((_, span)) => Err(SpannedError::new1("Unexpanded type reference", *span)),
+            ast::TypeExpr::Container(tc, t) => t.substitute(subs).map(|t|ast::TypeExpr::Container(*tc, t)),
 
             ast::TypeExpr::Ident(name) => Ok(subs.get(name).map(|(t, _)| t).unwrap_or(self).clone()),
         }

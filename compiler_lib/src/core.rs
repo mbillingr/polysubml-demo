@@ -101,6 +101,8 @@ pub enum VTypeHead {
         ty: TypeCtorInd,
     },
 
+    VContainer(StringId, Value, Use),
+
     VPolyHead(Rc<PolyHeadData>, Value, bool),
     VTypeVar(VarSpec),
     VDisjointIntersect(HashSet<VarSpec>, Option<Value>),
@@ -131,6 +133,9 @@ pub enum UTypeHead {
     UAbstract {
         ty: TypeCtorInd,
     },
+
+    UContainer(StringId, Use, Value),
+
     UPolyHead(Rc<PolyHeadData>, Use, bool),
     UTypeVar(VarSpec),
     UDisjointUnion(HashSet<VarSpec>, Option<Use>),
@@ -347,6 +352,14 @@ fn check_heads(
             } else {
                 return Err(type_mismatch_err(strings, type_ctors, lhs, rhs));
             }
+        }
+
+        (&VContainer(n1, r1, w1), &UContainer(n2, r2, w2)) => {
+            if n1 != n2 {
+                return Err(type_mismatch_err(strings, type_ctors, lhs, rhs));
+            }
+            out.push((w2, w1, edge_context.flip()));
+            out.push((r1, r2, edge_context));
         }
 
         (&VTypeVar(tv1), &UTypeVar(tv2)) => {

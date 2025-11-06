@@ -42,6 +42,7 @@ enum ParsedTypeHead {
     Top,
     Hole(HoleSrc),
     Simple(TypeCtorInd),
+    Container(StringId, RcParsedType),
 }
 type ParsedType = (PolyAndRecDeps, Span, ParsedTypeHead);
 type RcParsedType = Rc<ParsedType>;
@@ -195,6 +196,11 @@ impl<'a> TreeMaterializer<'a> {
                 return;
             }
 
+            &Container(tc, ref t) => {
+                let (v1, u1) = self.materialize_tree(t);
+                (VContainer(tc, v1, u1), UContainer(tc, u1, v1))
+            }
+
             &VarJoin(kind, ref vars, ref sub) => {
                 let sub = sub.as_deref().map(|ty| self.materialize_tree(ty));
                 let var_set = vars.iter().map(|(&vs, &span)| vs).collect();
@@ -239,7 +245,7 @@ impl<'a> TreeMaterializer<'a> {
     fn materialize_tree_sub(&mut self, ty: &ParsedType) -> (Value, Use) {
         use ParsedTypeHead::*;
         match &ty.2 {
-            Case(..) | Func(..) | Record(..) | PolyHead(..) | PolyVar(..) | RecHead(..) | VarJoin(..) => {
+            Case(..) | Func(..) | Record(..) | PolyHead(..) | PolyVar(..) | RecHead(..) | VarJoin(..) | Container(..) => {
                 let vredirect = self.core.val_placeholder();
                 let uredirect = self.core.use_placeholder();
                 let ph = (vredirect, uredirect);
@@ -522,6 +528,10 @@ impl<'a> TypeParser<'a> {
                 } else {
                     return Err(SyntaxError::new1("SyntaxError: Undefined type or type constructor", span));
                 }
+            }
+            Container(tc, t) => {
+                let t = deps.add(self.parse_type_sub(t)?);
+                ParsedTypeHead::Container(*tc, t)
             }
             &Poly(ref params, ref def, kind) => {
                 let loc = SourceLoc(span);

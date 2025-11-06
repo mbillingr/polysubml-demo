@@ -106,6 +106,10 @@ impl TypeckState {
         self.declare_builtin("__int_to_str", "int -> str", smgr, strings);
         self.declare_builtin("__float_to_str", "float -> str", smgr, strings);
 
+        self.declare_builtin("new_vec", "type a. any -> vec@a", smgr, strings);
+        self.declare_builtin("vec_pop", "type a. (vec@a) -> a", smgr, strings);
+        self.declare_builtin("vec_push", "type a. ((vec@a) * a) -> any", smgr, strings);
+
         self.bindings.make_permanent(n);
     }
 

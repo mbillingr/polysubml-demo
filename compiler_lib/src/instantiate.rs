@@ -69,6 +69,8 @@ impl InstantionContext<'_> {
         let head = match node.0 {
             VInstantiateExist { .. } | VTop | VAbstract { .. } | VTypeVar(..) => unreachable!(),
 
+            VContainer(tc, v, u) => VContainer(tc, self.instantiate_val(v), self.instantiate_use(u)),
+
             VUnion(vals) => VUnion(vals.into_iter().map(|v| self.instantiate_val(v)).collect()),
 
             VFunc { arg, ret } => VFunc {
@@ -141,6 +143,8 @@ impl InstantionContext<'_> {
 
         let head = match node.0 {
             UInstantiateUni { .. } | UBot | UAbstract { .. } | UTypeVar(..) => unreachable!(),
+
+            UContainer(tc, u, v) => UContainer(tc, self.instantiate_use(u), self.instantiate_val(v)),
 
             UIntersection(uses) => UIntersection(uses.into_iter().map(|u| self.instantiate_use(u)).collect()),
 

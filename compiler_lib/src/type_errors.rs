@@ -159,6 +159,7 @@ pub fn type_mismatch_err(
             let name = strings.resolve(&tycon.name);
             HaveTy(name.to_owned(), tycon.span)
         }
+        VContainer(..) => be_a("container"),
         // VAbstract { ty, .. } => &type_ctors[ty.0].debug,
         VTypeVar(tv) => BeA(format!("type parameter {}", strings.resolve(&tv.name))),
         VDisjointIntersect(..) => be_a("intersection"),
@@ -177,6 +178,7 @@ pub fn type_mismatch_err(
             let name = strings.resolve(&tycon.name);
             HaveTy(name.to_owned(), tycon.span)
         }
+        UContainer(..) => be_a("container"),
         // VAbstract { ty, .. } => &type_ctors[ty.0].debug,
         UTypeVar(tv) => BeA(format!("type parameter {}", strings.resolve(&tv.name))),
         UDisjointUnion(..) => be_a("union"),
