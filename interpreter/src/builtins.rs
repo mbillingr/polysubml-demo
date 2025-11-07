@@ -3,10 +3,10 @@ use std::io::BufRead;
 use num::ToPrimitive;
 use compiler_lib::ast::StringId;
 use compiler_lib::Rodeo;
-use crate::interpreter::{Context, Env};
+use crate::interpreter::{Context, Env, Runtime, StaticEnv};
 use crate::value::Value;
 
-pub fn define_builtins(env: Env, strings: &mut Rodeo) -> Env {
+pub fn define_builtins(static_env: &mut StaticEnv, env: &mut Env, strings: &mut Rodeo) {
     let ok = strings.get_or_intern_static("Ok");
     let err = strings.get_or_intern_static("Err");
 
@@ -16,7 +16,7 @@ pub fn define_builtins(env: Env, strings: &mut Rodeo) -> Env {
     let idx1 = strings.get_or_intern_static("_1");
     let idx2 = strings.get_or_intern_static("_2");
 
-    let mut bb = BuiltinBuilder::new(env, strings);
+    let mut bb = BuiltinBuilder::new(static_env, env, strings);
 
     bb.bind("panic", |msg, ctx| panic!("{}", msg.show(ctx.strings)));
 
@@ -104,12 +104,11 @@ pub fn define_builtins(env: Env, strings: &mut Rodeo) -> Env {
         let x = x.map(|x| *x = val);
         x.map(|_| Value::vect(v))
     });
-
-    bb.env
 }
 
 struct BuiltinBuilder<'a> {
-    env: Env,
+    static_env: &'a mut StaticEnv,
+    dynamic_env: &'a mut Env,
     strings: &'a mut Rodeo,
 
     tag_some: StringId,
@@ -117,22 +116,24 @@ struct BuiltinBuilder<'a> {
 }
 
 impl<'a> BuiltinBuilder<'a> {
-    fn new(env: Env, strings: &'a mut Rodeo) -> Self {
+    fn new(static_env: &'a mut StaticEnv, dynamic_env: &'a mut Env, strings: &'a mut Rodeo) -> Self {
         BuiltinBuilder {
-            env,
+            static_env,
+            dynamic_env,
             tag_some: strings.get_or_intern_static("Some"),
             val_none: Value::case(strings.get_or_intern_static("None"), Value::Nothing),
             strings,
         }
     }
 
-    fn bind(&mut self, name: &'static str, f: impl Fn(Value, &mut Context) -> Value + 'static) {
+    fn bind(&mut self, name: &'static str, f: impl Fn(Value, &mut Runtime) -> Value + 'static) {
         let name = self.strings.get_or_intern_static(name);
         let value = Value::builtin(f);
-        self.env = self.env.bind(name, value)
+        let bnd = self.static_env.push_binding(name);
+        self.dynamic_env.bind(bnd, value)
     }
 
-    fn bind_opt(&mut self, name: &'static str, f: impl Fn(Value, &mut Context) -> Option<Value> + 'static) {
+    fn bind_opt(&mut self, name: &'static str, f: impl Fn(Value, &mut Runtime) -> Option<Value> + 'static) {
         let some = self.tag_some;
         let none = self.val_none.clone();
         self.bind(name, move |arg, ctx| match f(arg, ctx) {

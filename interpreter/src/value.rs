@@ -1,4 +1,6 @@
-use crate::interpreter::{Context, Env};
+use std::borrow::Cow;
+use std::cell::RefCell;
+use crate::interpreter::{CompiledExpr, CompiledPattern, Context, Env, Runtime};
 use compiler_lib::ast::StringId;
 use compiler_lib::{Rodeo, ast};
 use std::collections::HashMap;
@@ -9,6 +11,7 @@ type Int = num_bigint::BigInt;
 #[derive(Clone, Debug)]
 pub enum Value {
     Nothing,
+    MaybeUninit(Arc<RwLock<Option<Value>>>),
 
     Bool(bool),
     Int(Int),
@@ -18,13 +21,38 @@ pub enum Value {
     Case(Arc<(StringId, Self)>),
     Record(Arc<RwLock<HashMap<StringId, Self>>>),
 
-    Func(Arc<(ast::LetPattern, ast::Expr, Env)>),
+    Func(Arc<Function>),
     Builtin(Builtin),
 
     Vect(im::Vector<Value>),
 }
 
 impl Value {
+    pub fn uninitialized() -> Value {
+        Value::MaybeUninit(Arc::new(RwLock::new(None)))
+    }
+
+    pub fn initialize(&self, val: Value) {
+        match self {
+            Value::MaybeUninit(lock) => {
+                let mut lock = lock.write().unwrap();
+                *lock = Some(val);
+            }
+            _ => unimplemented!(),
+        }
+    }
+    
+    pub fn initialized(&self) -> Cow<Self> {
+        match self {
+            Value::MaybeUninit(lock) => {
+                let lock = lock.read().unwrap();
+                Cow::Owned(lock.as_ref().unwrap().clone())
+            }
+            other => Cow::Borrowed(other),
+        }
+    }
+
+
     pub fn bool(b: bool) -> Value {
         Value::Bool(b)
     }
@@ -85,11 +113,11 @@ impl Value {
         Value::Record(Arc::new(RwLock::new(fields.collect())))
     }
 
-    pub fn func(param: ast::LetPattern, expr: ast::Expr, env: Env) -> Value {
-        Value::Func(Arc::new((param, expr, env)))
+    pub fn func(param: CompiledPattern, body: CompiledExpr, closure: Env) -> Value {
+        Value::Func(Arc::new(Function{param, body, closure}))
     }
 
-    pub fn builtin(f: impl Fn(Value, &mut Context) -> Value + 'static) -> Value {
+    pub fn builtin(f: impl Fn(Value, &mut Runtime) -> Value + 'static) -> Value {
         Value::Builtin(Builtin(Arc::new(f)))
     }
 
@@ -135,6 +163,10 @@ impl Value {
     pub fn show(&self, r: &Rodeo) -> String {
         match self {
             Value::Nothing => "()".to_string(),
+            Value::MaybeUninit(lock) => match &*lock.read().unwrap() {
+                None => "<uninitialized>".to_string(),
+                Some(v) => v.show(r),
+            }
             Value::Bool(b) => b.to_string(),
             Value::Int(i) => i.to_string(),
             Value::Float(x) => x.to_string(),
@@ -237,10 +269,24 @@ impl std::cmp::PartialEq for Value {
 }
 
 #[derive(Clone)]
-pub struct Builtin(pub Arc<dyn Fn(Value, &mut Context) -> Value>);
+pub struct Builtin(pub Arc<dyn Fn(Value, &mut Runtime) -> Value>);
 
 impl std::fmt::Debug for Builtin {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<builtin function>")
+    }
+}
+
+
+#[derive(Clone)]
+pub struct Function {
+    pub param: CompiledPattern,
+    pub body: CompiledExpr,
+    pub closure: Env,
+}
+
+impl std::fmt::Debug for Function {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<function>")
     }
 }
