@@ -1,7 +1,7 @@
 use crate::interpreter::{Context, Env};
 use compiler_lib::ast::StringId;
 use compiler_lib::{Rodeo, ast};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, RwLock};
 
 type Int = num_bigint::BigInt;
@@ -20,6 +20,8 @@ pub enum Value {
 
     Func(Arc<(ast::LetPattern, ast::Expr, Env)>),
     Builtin(Builtin),
+
+    Vect(Arc<RwLock<VecDeque<Value>>>),
 }
 
 impl Value {
@@ -90,6 +92,24 @@ impl Value {
     pub fn builtin(f: impl Fn(Value, &mut Context) -> Value + 'static) -> Value {
         Value::Builtin(Builtin(Arc::new(f)))
     }
+
+    pub fn vect(data: impl Into<VecDeque<Value>>) -> Value {
+        Value::Vect(Arc::new(RwLock::new(data.into())))
+    }
+
+    pub fn with_vect<T>(&self, f: impl FnOnce(&VecDeque<Value>) -> T) -> T {
+        match self {
+            Value::Vect(v) => f(&*v.read().unwrap()),
+            _ => unimplemented!(),
+        }
+    }
+
+    pub fn with_vect_mut<T>(&self, f: impl FnOnce(&mut VecDeque<Value>) -> T) -> T {
+        match self {
+            Value::Vect(v) => f(&mut *v.write().unwrap()),
+            _ => unimplemented!(),
+        }
+    }
 }
 
 impl Value {
@@ -136,9 +156,23 @@ impl Value {
                 s.push('}');
                 s
             }
+
             Value::Func(_) => "<fun>".to_string(),
             //Value::Func(f) => format!("{:?}", f),
             Value::Builtin(_) => "<builtin function>".to_string(),
+
+            Value::Vect(v) => {
+                let mut s = String::new();
+                s.push('[');
+                for (i, v) in v.read().unwrap().iter().enumerate() {
+                    if i > 0 {
+                        s.push_str(", ");
+                    }
+                    s.push_str(&v.show(r));
+                }
+                s.push(']');
+                s
+            }
         }
     }
 }

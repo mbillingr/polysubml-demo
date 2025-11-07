@@ -251,6 +251,16 @@ impl Env {
         let eof_ = Value::case(strings.get_or_intern_static("Eof"), Value::int(0.into()));
         let none_ = Value::case(strings.get_or_intern_static("None"), Value::Nothing);
 
+        let idx0 = strings.get_or_intern_static("_0");
+        let idx1 = strings.get_or_intern_static("_1");
+        let idx2 = strings.get_or_intern_static("_2");
+
+        let none = none_.clone();
+        let optional_ = move |opt: Option<Value>| match opt {
+            Some(x) => Value::case(some, x),
+            None => none.clone(),
+        };
+
         let name = strings.get_or_intern_static("panic");
         let value = Value::builtin(|msg, ctx| panic!("{}", msg.show(ctx.strings)));
         env = env.bind(name, value);
@@ -346,7 +356,64 @@ impl Env {
         let vaue = Value::builtin(move |x, _| Value::string(x.as_float().to_string()));
         env = env.bind(name, vaue);
 
+        env = env.bind_builtin("__vec_new", strings, |_, _| Value::vect([]));
+        env = env.bind_builtin("__vec_length", strings, move |v, _| {
+            Value::int(v.with_vect(|v| v.len()).into())
+        });
+        env = env.bind_builtin("__vec_push_back", strings, move |args, _| {
+            let v = args.get_field(idx0);
+            let x = args.get_field(idx1);
+            v.with_vect_mut(|v| v.push_back(x));
+            Value::Nothing
+        });
+        let optional = optional_.clone();
+        env = env.bind_builtin("__vec_pop_back", strings, move |v, _| {
+            optional(v.with_vect_mut(|v| v.pop_back()))
+        });
+        env = env.bind_builtin("__vec_push_front", strings, move |args, _| {
+            let v = args.get_field(idx0);
+            let x = args.get_field(idx1);
+            v.with_vect_mut(|v| v.push_front(x));
+            Value::Nothing
+        });
+        let optional = optional_.clone();
+        env = env.bind_builtin("__vec_pop_front", strings, move |v, _| {
+            optional(v.with_vect_mut(|v| v.pop_front()))
+        });
+        let optional = optional_.clone();
+        env = env.bind_builtin("__vec_get", strings, move |args, _| {
+            let vec = args.get_field(idx0);
+            let idx = args.get_field(idx1).as_int().to_usize();
+            let x = idx.and_then(|i| vec.with_vect_mut(|v| v.get(i).cloned()));
+            optional(x)
+        });
+        let optional = optional_.clone();
+        env = env.bind_builtin("__vec_set", strings, move |args, _| {
+            let vec = args.get_field(idx0);
+            let idx = args.get_field(idx1).as_int().to_usize();
+            let val = args.get_field(idx2);
+            let x = idx.and_then(|i| {
+                vec.with_vect_mut(|v| {
+                    v.get_mut(i).and_then(|x| {
+                        Some(std::mem::replace(x, val))
+                    })
+                })
+            });
+            optional(x)
+        });
+
         env
+    }
+
+    fn bind_builtin(
+        &self,
+        name: &'static str,
+        strings: &mut Rodeo,
+        f: impl Fn(Value, &mut Context) -> Value + 'static,
+    ) -> Self {
+        let name = strings.get_or_intern_static(name);
+        let value = Value::builtin(f);
+        self.bind(name, value)
     }
 
     fn bind(&self, name: StringId, value: Value) -> Env {

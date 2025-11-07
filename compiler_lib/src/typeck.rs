@@ -106,9 +106,14 @@ impl TypeckState {
         self.declare_builtin("__int_to_str", "int -> str", smgr, strings);
         self.declare_builtin("__float_to_str", "float -> str", smgr, strings);
 
-        self.declare_builtin("new_vec", "type a. any -> vec@a", smgr, strings);
-        self.declare_builtin("vec_pop", "type a. (vec@a) -> a", smgr, strings);
-        self.declare_builtin("vec_push", "type a. ((vec@a) * a) -> any", smgr, strings);
+        self.declare_builtin("__vec_new", "type a. any -> vec@a", smgr, strings);
+        self.declare_builtin("__vec_length", "vec@any -> int", smgr, strings);
+        self.declare_builtin("__vec_pop_back", "type a. (vec@a) -> [`Some a | `None any]", smgr, strings);
+        self.declare_builtin("__vec_pop_front", "type a. (vec@a) -> [`Some a | `None any]", smgr, strings);
+        self.declare_builtin("__vec_push_back", "type a. ((vec@a) * a) -> any", smgr, strings);
+        self.declare_builtin("__vec_push_front", "type a. ((vec@a) * a) -> any", smgr, strings);
+        self.declare_builtin("__vec_get", "type a. ((vec@a) * int) -> [`Some a | `None any]", smgr, strings);
+        self.declare_builtin("__vec_set", "type a. ((vec@a) * int * a) -> [`Some a | `None any]", smgr, strings);
 
         self.bindings.make_permanent(n);
     }
