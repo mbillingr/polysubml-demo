@@ -2,15 +2,14 @@ use crate::value::Builtin;
 use crate::value::Value;
 use compiler_lib::ast::StringId;
 use compiler_lib::{Rodeo, ast};
-use num::ToPrimitive;
 use std::borrow::Cow;
 use std::cell::RefCell;
-use std::io::BufRead;
 use std::sync::Arc;
+use crate::builtins::define_builtins;
 
 pub struct Context<'a> {
-    state: &'a mut State,
-    strings: &'a mut Rodeo,
+    pub state: &'a mut State,
+    pub strings: &'a mut Rodeo,
 }
 
 pub struct State {
@@ -20,7 +19,7 @@ pub struct State {
 impl State {
     pub fn with_builtins(strings: &mut Rodeo) -> Self {
         State {
-            env: Env::builtins(strings),
+            env: define_builtins(Env::new(), strings),
         }
     }
 }
@@ -236,148 +235,12 @@ pub enum Env {
     Lazy(Arc<(StringId, RefCell<Option<Value>>, Env)>),
 }
 
-struct BuiltinBuilder<'a> {
-    env: Env,
-    strings: &'a mut Rodeo,
-
-    tag_some: StringId,
-    val_none: Value,
-}
-
-impl<'a> BuiltinBuilder<'a> {
-    fn new(strings: &'a mut Rodeo) -> Self {
-        BuiltinBuilder {
-            env: Env::new(),
-            tag_some: strings.get_or_intern_static("Some"),
-            val_none: Value::case(strings.get_or_intern_static("None"), Value::Nothing),
-            strings,
-        }
-    }
-
-    fn bind(&mut self, name: &'static str, f: impl Fn(Value, &mut Context) -> Value + 'static) {
-        let name = self.strings.get_or_intern_static(name);
-        let value = Value::builtin(f);
-        self.env = self.env.bind(name, value)
-    }
-
-    fn bind_opt(&mut self, name: &'static str, f: impl Fn(Value, &mut Context) -> Option<Value> + 'static) {
-        let some = self.tag_some;
-        let none = self.val_none.clone();
-        self.bind(name, move |arg, ctx| match f(arg, ctx) {
-            Some(x) => Value::case(some, x),
-            None => none.clone(),
-        })
-    }
-}
-
 impl Env {
     fn new() -> Env {
         Env::Empty
     }
 
-    fn builtins(strings: &mut Rodeo) -> Env {
-        let ok = strings.get_or_intern_static("Ok");
-        let err = strings.get_or_intern_static("Err");
-
-        let eof_ = Value::case(strings.get_or_intern_static("Eof"), Value::int(0.into()));
-
-        let idx0 = strings.get_or_intern_static("_0");
-        let idx1 = strings.get_or_intern_static("_1");
-        let idx2 = strings.get_or_intern_static("_2");
-
-        let mut bb = BuiltinBuilder::new(strings);
-
-        bb.bind("panic", |msg, ctx| panic!("{}", msg.show(ctx.strings)));
-
-        let eof = eof_.clone();
-        bb.bind("__read_line", move |_, _| {
-            let mut s = String::new();
-            match std::io::stdin().lock().read_line(&mut s) {
-                Ok(0) => eof.clone(),
-                Ok(_) => {
-                    if s.ends_with('\n') {
-                        s.pop();
-                    }
-                    Value::case(ok, Value::string(s))
-                }
-                Err(e) => Value::case(err, Value::string(e.to_string())),
-            }
-        });
-
-        bb.bind("__write_str", |s, _| {
-            print!("{}", s.as_str());
-            Value::Nothing
-        });
-
-        bb.bind_opt("__chars", |s, _| {
-            let chars = RefCell::new(s.as_str().chars().rev().collect::<Vec<_>>());
-            chars.borrow_mut().pop().map(|ch| Value::string(ch.to_string()))
-        });
-
-        bb.bind_opt("__split", |s, _| {
-            let parts = RefCell::new(s.as_str().split_whitespace().rev().map(str::to_string).collect::<Vec<_>>());
-            parts.borrow_mut().pop().map(Value::string)
-        });
-
-        bb.bind("__escape", move |s, _| {
-            Value::string(String::from_utf8(escape_bytes::escape(s.as_str().bytes())).unwrap())
-        });
-
-        bb.bind("__unescape", move |s, _| {
-            Value::string(String::from_utf8(escape_bytes::unescape(s.as_str().bytes()).unwrap()).unwrap())
-        });
-
-        bb.bind("__int_to_float", |x, _| Value::float(x.as_int().to_f64().unwrap()));
-        bb.bind("__float_to_int", |x, _| Value::int((x.as_float() as i64).into()));
-        bb.bind_opt("__str_to_int", |x, _| x.as_str().parse::<_>().map(Value::int).ok());
-        bb.bind_opt("__str_to_float", |x, _| x.as_str().parse::<_>().map(Value::float).ok());
-        bb.bind("__int_to_str", |x, _| Value::string(x.as_int().to_string()));
-        bb.bind("__float_to_str", |x, _| Value::string(x.as_float().to_string()));
-
-        bb.bind("__vec_new", |_, _| Value::vect(vec![]));
-        bb.bind("__vec_length", move |vec, _| Value::int(vec.as_vect().len().into()));
-        bb.bind("__vec_push_back", move |args, _| {
-            let mut v = args.get_field(idx0).as_vect().clone();
-            let x = args.get_field(idx1);
-            v.push_back(x);
-            Value::vect(v)
-        });
-        bb.bind("__vec_pop_back", move |vec, _| {
-            let mut v = vec.as_vect().clone();
-            v.pop_back();
-            Value::vect(v)
-        });
-        bb.bind_opt("__vec_peek_back", move |vec, _| vec.as_vect().clone().back().cloned());
-        bb.bind("__vec_push_front", move |args, _| {
-            let mut v = args.get_field(idx0).as_vect().clone();
-            let x = args.get_field(idx1);
-            v.push_front(x);
-            Value::vect(v)
-        });
-        bb.bind("__vec_pop_front", move |vec, _| {
-            let mut v = vec.as_vect().clone();
-            v.pop_front();
-            Value::vect(v)
-        });
-        bb.bind_opt("__vec_peek_front", move |vec, _| vec.as_vect().clone().front().cloned());
-        bb.bind_opt("__vec_get", move |args, _| {
-            let v = args.get_field(idx0).as_vect().clone();
-            let idx = args.get_field(idx1).as_int().to_usize();
-            idx.and_then(|i| v.get(i).cloned())
-        });
-        bb.bind_opt("__vec_set", move |args, _| {
-            let mut v = args.get_field(idx0).as_vect().clone();
-            let idx = args.get_field(idx1).as_int().to_usize();
-            let val = args.get_field(idx2);
-            let x = idx.and_then(|i| v.get_mut(i));
-            let x = x.map(|x| *x = val);
-            x.map(|_| Value::vect(v))
-        });
-
-        bb.env
-    }
-
-    fn bind(&self, name: StringId, value: Value) -> Env {
+    pub fn bind(&self, name: StringId, value: Value) -> Env {
         Env::Entry(Arc::new((name, value, self.clone())))
     }
 

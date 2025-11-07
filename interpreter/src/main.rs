@@ -3,6 +3,7 @@ mod expand_imports;
 mod expand_types;
 mod interpreter;
 mod value;
+mod builtins;
 
 use crate::expand::expand_syntax;
 use compiler_lib::State;
