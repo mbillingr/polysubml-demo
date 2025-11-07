@@ -12,4 +12,9 @@
 
     ; read_line = __read_line
     ; write_str = __write_str
+
+    ; read_expected_line = fun x ->
+        match __read_line x with
+            | `Ok l -> l
+            | _ -> panic "could not read line"
 }
