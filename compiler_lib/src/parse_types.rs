@@ -198,7 +198,7 @@ impl<'a> TreeMaterializer<'a> {
 
             &Container(tc, ref t) => {
                 let (v1, u1) = self.materialize_tree(t);
-                (VContainer(tc, v1, u1), UContainer(tc, u1, v1))
+                (VContainer(tc, v1), UContainer(tc, u1))
             }
 
             &VarJoin(kind, ref vars, ref sub) => {

@@ -236,38 +236,61 @@ pub enum Env {
     Lazy(Arc<(StringId, RefCell<Option<Value>>, Env)>),
 }
 
+struct BuiltinBuilder<'a> {
+    env: Env,
+    strings: &'a mut Rodeo,
+
+    tag_some: StringId,
+    val_none: Value,
+}
+
+impl<'a> BuiltinBuilder<'a> {
+    fn new(strings: &'a mut Rodeo) -> Self {
+        BuiltinBuilder {
+            env: Env::new(),
+            tag_some: strings.get_or_intern_static("Some"),
+            val_none: Value::case(strings.get_or_intern_static("None"), Value::Nothing),
+            strings,
+        }
+    }
+
+    fn bind(&mut self, name: &'static str, f: impl Fn(Value, &mut Context) -> Value + 'static) {
+        let name = self.strings.get_or_intern_static(name);
+        let value = Value::builtin(f);
+        self.env = self.env.bind(name, value)
+    }
+
+    fn bind_opt(&mut self, name: &'static str, f: impl Fn(Value, &mut Context) -> Option<Value> + 'static) {
+        let some = self.tag_some;
+        let none = self.val_none.clone();
+        self.bind(name, move |arg, ctx| match f(arg, ctx) {
+            Some(x) => Value::case(some, x),
+            None => none.clone(),
+        })
+    }
+}
+
 impl Env {
     fn new() -> Env {
         Env::Empty
     }
 
     fn builtins(strings: &mut Rodeo) -> Env {
-        let mut env = Env::new();
-
         let ok = strings.get_or_intern_static("Ok");
         let err = strings.get_or_intern_static("Err");
-        let some = strings.get_or_intern_static("Some");
 
         let eof_ = Value::case(strings.get_or_intern_static("Eof"), Value::int(0.into()));
-        let none_ = Value::case(strings.get_or_intern_static("None"), Value::Nothing);
 
         let idx0 = strings.get_or_intern_static("_0");
         let idx1 = strings.get_or_intern_static("_1");
         let idx2 = strings.get_or_intern_static("_2");
 
-        let none = none_.clone();
-        let optional_ = move |opt: Option<Value>| match opt {
-            Some(x) => Value::case(some, x),
-            None => none.clone(),
-        };
+        let mut bb = BuiltinBuilder::new(strings);
 
-        let name = strings.get_or_intern_static("panic");
-        let value = Value::builtin(|msg, ctx| panic!("{}", msg.show(ctx.strings)));
-        env = env.bind(name, value);
+        bb.bind("panic", |msg, ctx| panic!("{}", msg.show(ctx.strings)));
 
-        let name = strings.get_or_intern_static("__read_line");
         let eof = eof_.clone();
-        let value = Value::builtin(move |_, _| {
+        bb.bind("__read_line", move |_, _| {
             let mut s = String::new();
             match std::io::stdin().lock().read_line(&mut s) {
                 Ok(0) => eof.clone(),
@@ -280,140 +303,78 @@ impl Env {
                 Err(e) => Value::case(err, Value::string(e.to_string())),
             }
         });
-        env = env.bind(name, value);
 
-        let name = strings.get_or_intern_static("__write_str");
-        let value = Value::builtin(|s, _| {
+        bb.bind("__write_str", |s, _| {
             print!("{}", s.as_str());
             Value::Nothing
         });
-        env = env.bind(name, value);
 
-        let name = strings.get_or_intern_static("__chars");
-        let none = none_.clone();
-        let value = Value::builtin(move |s, _| {
-            let none = none.clone();
+        bb.bind_opt("__chars", |s, _| {
             let chars = RefCell::new(s.as_str().chars().rev().collect::<Vec<_>>());
-            Value::builtin(move |_, _| match chars.borrow_mut().pop() {
-                None => none.clone(),
-                Some(ch) => Value::case(some, Value::string(ch.to_string())),
-            })
+            chars.borrow_mut().pop().map(|ch| Value::string(ch.to_string()))
         });
-        env = env.bind(name, value);
 
-        let name = strings.get_or_intern_static("__split");
-        let none = none_.clone();
-        let value = Value::builtin(move |s, _| {
-            let none = none.clone();
+        bb.bind_opt("__split", |s, _| {
             let parts = RefCell::new(s.as_str().split_whitespace().rev().map(str::to_string).collect::<Vec<_>>());
-            Value::builtin(move |_, _| match parts.borrow_mut().pop() {
-                None => none.clone(),
-                Some(ch) => Value::case(some, Value::string(ch.to_string())),
-            })
+            parts.borrow_mut().pop().map(Value::string)
         });
-        env = env.bind(name, value);
 
-        let name = strings.get_or_intern_static("__escape");
-        let value =
-            Value::builtin(move |s, _| Value::string(String::from_utf8(escape_bytes::escape(s.as_str().bytes())).unwrap()));
-        env = env.bind(name, value);
+        bb.bind("__escape", move |s, _| {
+            Value::string(String::from_utf8(escape_bytes::escape(s.as_str().bytes())).unwrap())
+        });
 
-        let name = strings.get_or_intern_static("__unescape");
-        let value = Value::builtin(move |s, _| {
+        bb.bind("__unescape", move |s, _| {
             Value::string(String::from_utf8(escape_bytes::unescape(s.as_str().bytes()).unwrap()).unwrap())
         });
-        env = env.bind(name, value);
 
-        let name = strings.get_or_intern_static("__int_to_float");
-        let vaue = Value::builtin(move |x, _| Value::float(x.as_int().to_f64().unwrap()));
-        env = env.bind(name, vaue);
+        bb.bind("__int_to_float", |x, _| Value::float(x.as_int().to_f64().unwrap()));
+        bb.bind("__float_to_int", |x, _| Value::int((x.as_float() as i64).into()));
+        bb.bind_opt("__str_to_int", |x, _| x.as_str().parse::<_>().map(Value::int).ok());
+        bb.bind_opt("__str_to_float", |x, _| x.as_str().parse::<_>().map(Value::float).ok());
+        bb.bind("__int_to_str", |x, _| Value::string(x.as_int().to_string()));
+        bb.bind("__float_to_str", |x, _| Value::string(x.as_float().to_string()));
 
-        let name = strings.get_or_intern_static("__float_to_int");
-        let vaue = Value::builtin(move |x, _| Value::int((x.as_float() as i64).into()));
-        env = env.bind(name, vaue);
-
-        let name = strings.get_or_intern_static("__str_to_int");
-        let none = none_.clone();
-        let vaue = Value::builtin(move |x, _| match x.as_str().parse::<_>() {
-            Ok(x) => Value::case(some, Value::int(x)),
-            Err(_) => none.clone(),
-        });
-        env = env.bind(name, vaue);
-
-        let name = strings.get_or_intern_static("__str_to_float");
-        let none = none_.clone();
-        let vaue = Value::builtin(move |x, _| match x.as_str().parse::<_>() {
-            Ok(x) => Value::case(some, Value::float(x)),
-            Err(_) => none.clone(),
-        });
-        env = env.bind(name, vaue);
-
-        let name = strings.get_or_intern_static("__int_to_str");
-        let vaue = Value::builtin(move |x, _| Value::string(x.as_int().to_string()));
-        env = env.bind(name, vaue);
-
-        let name = strings.get_or_intern_static("__float_to_str");
-        let vaue = Value::builtin(move |x, _| Value::string(x.as_float().to_string()));
-        env = env.bind(name, vaue);
-
-        env = env.bind_builtin("__vec_new", strings, |_, _| Value::vect([]));
-        env = env.bind_builtin("__vec_length", strings, move |v, _| {
-            Value::int(v.with_vect(|v| v.len()).into())
-        });
-        env = env.bind_builtin("__vec_push_back", strings, move |args, _| {
-            let v = args.get_field(idx0);
+        bb.bind("__vec_new", |_, _| Value::vect(vec![]));
+        bb.bind("__vec_length", move |vec, _| Value::int(vec.as_vect().len().into()));
+        bb.bind("__vec_push_back", move |args, _| {
+            let mut v = args.get_field(idx0).as_vect().clone();
             let x = args.get_field(idx1);
-            v.with_vect_mut(|v| v.push_back(x));
-            Value::Nothing
+            v.push_back(x);
+            Value::vect(v)
         });
-        let optional = optional_.clone();
-        env = env.bind_builtin("__vec_pop_back", strings, move |v, _| {
-            optional(v.with_vect_mut(|v| v.pop_back()))
+        bb.bind("__vec_pop_back", move |vec, _| {
+            let mut v = vec.as_vect().clone();
+            v.pop_back();
+            Value::vect(v)
         });
-        env = env.bind_builtin("__vec_push_front", strings, move |args, _| {
-            let v = args.get_field(idx0);
+        bb.bind_opt("__vec_peek_back", move |vec, _| vec.as_vect().clone().back().cloned());
+        bb.bind("__vec_push_front", move |args, _| {
+            let mut v = args.get_field(idx0).as_vect().clone();
             let x = args.get_field(idx1);
-            v.with_vect_mut(|v| v.push_front(x));
-            Value::Nothing
+            v.push_front(x);
+            Value::vect(v)
         });
-        let optional = optional_.clone();
-        env = env.bind_builtin("__vec_pop_front", strings, move |v, _| {
-            optional(v.with_vect_mut(|v| v.pop_front()))
+        bb.bind("__vec_pop_front", move |vec, _| {
+            let mut v = vec.as_vect().clone();
+            v.pop_front();
+            Value::vect(v)
         });
-        let optional = optional_.clone();
-        env = env.bind_builtin("__vec_get", strings, move |args, _| {
-            let vec = args.get_field(idx0);
+        bb.bind_opt("__vec_peek_front", move |vec, _| vec.as_vect().clone().front().cloned());
+        bb.bind_opt("__vec_get", move |args, _| {
+            let v = args.get_field(idx0).as_vect().clone();
             let idx = args.get_field(idx1).as_int().to_usize();
-            let x = idx.and_then(|i| vec.with_vect_mut(|v| v.get(i).cloned()));
-            optional(x)
+            idx.and_then(|i| v.get(i).cloned())
         });
-        let optional = optional_.clone();
-        env = env.bind_builtin("__vec_set", strings, move |args, _| {
-            let vec = args.get_field(idx0);
+        bb.bind_opt("__vec_set", move |args, _| {
+            let mut v = args.get_field(idx0).as_vect().clone();
             let idx = args.get_field(idx1).as_int().to_usize();
             let val = args.get_field(idx2);
-            let x = idx.and_then(|i| {
-                vec.with_vect_mut(|v| {
-                    v.get_mut(i).and_then(|x| {
-                        Some(std::mem::replace(x, val))
-                    })
-                })
-            });
-            optional(x)
+            let x = idx.and_then(|i| v.get_mut(i));
+            let x = x.map(|x| *x = val);
+            x.map(|_| Value::vect(v))
         });
 
-        env
-    }
-
-    fn bind_builtin(
-        &self,
-        name: &'static str,
-        strings: &mut Rodeo,
-        f: impl Fn(Value, &mut Context) -> Value + 'static,
-    ) -> Self {
-        let name = strings.get_or_intern_static(name);
-        let value = Value::builtin(f);
-        self.bind(name, value)
+        bb.env
     }
 
     fn bind(&self, name: StringId, value: Value) -> Env {
