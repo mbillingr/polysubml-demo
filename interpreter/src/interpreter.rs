@@ -1,3 +1,4 @@
+use crate::builtins;
 use crate::value::Builtin;
 use crate::value::Value;
 use compiler_lib::ast::StringId;
@@ -5,7 +6,6 @@ use compiler_lib::{Rodeo, ast};
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::sync::Arc;
-use crate::builtins::define_builtins;
 
 pub struct Context<'a> {
     pub state: &'a mut State,
@@ -17,10 +17,8 @@ pub struct State {
 }
 
 impl State {
-    pub fn with_builtins(strings: &mut Rodeo) -> Self {
-        State {
-            env: define_builtins(Env::new(), strings),
-        }
+    pub fn new(env: Env) -> Self {
+        State { env }
     }
 }
 
@@ -111,7 +109,7 @@ impl<'a> Context<'a> {
                         self.state.env = old_env;
                         result
                     }
-                    Value::Builtin(Builtin(f)) => f(arg, self),
+                    Value::Builtin(Builtin(f)) => f(arg, &mut builtins::Context { strings: self.strings }),
                     _ => panic!("not callable: {:?}", func),
                 }
             }
@@ -236,7 +234,7 @@ pub enum Env {
 }
 
 impl Env {
-    fn new() -> Env {
+    pub fn new() -> Env {
         Env::Empty
     }
 

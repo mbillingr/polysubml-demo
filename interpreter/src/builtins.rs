@@ -1,12 +1,23 @@
+use crate::interpreter::Env;
+use crate::value::Value;
+use crate::vm;
+use compiler_lib::Rodeo;
+use compiler_lib::ast::StringId;
+use num::ToPrimitive;
 use std::cell::RefCell;
 use std::io::BufRead;
-use num::ToPrimitive;
-use compiler_lib::ast::StringId;
-use compiler_lib::Rodeo;
-use crate::interpreter::{Context, Env};
-use crate::value::Value;
 
-pub fn define_builtins(env: Env, strings: &mut Rodeo) -> Env {
+pub struct Context<'a> {
+    pub strings: &'a Rodeo,
+}
+
+impl<'a> From<&'a Rodeo> for Context<'a> {
+    fn from(strings: &'a Rodeo) -> Self {
+        Context { strings }
+    }
+}
+
+pub fn define_builtins(env: Env, vm_env: vm::Env, strings: &mut Rodeo) -> (Env, vm::Env) {
     let ok = strings.get_or_intern_static("Ok");
     let err = strings.get_or_intern_static("Err");
 
@@ -16,7 +27,7 @@ pub fn define_builtins(env: Env, strings: &mut Rodeo) -> Env {
     let idx1 = strings.get_or_intern_static("_1");
     let idx2 = strings.get_or_intern_static("_2");
 
-    let mut bb = BuiltinBuilder::new(env, strings);
+    let mut bb = BuiltinBuilder::new(env, vm_env, strings);
 
     bb.bind("panic", |msg, ctx| panic!("{}", msg.show(ctx.strings)));
 
@@ -105,11 +116,12 @@ pub fn define_builtins(env: Env, strings: &mut Rodeo) -> Env {
         x.map(|_| Value::vect(v))
     });
 
-    bb.env
+    (bb.env, bb.vm_env)
 }
 
 struct BuiltinBuilder<'a> {
     env: Env,
+    vm_env: vm::Env,
     strings: &'a mut Rodeo,
 
     tag_some: StringId,
@@ -117,9 +129,10 @@ struct BuiltinBuilder<'a> {
 }
 
 impl<'a> BuiltinBuilder<'a> {
-    fn new(env: Env, strings: &'a mut Rodeo) -> Self {
+    fn new(env: Env, vm_env: vm::Env, strings: &'a mut Rodeo) -> Self {
         BuiltinBuilder {
             env,
+            vm_env,
             tag_some: strings.get_or_intern_static("Some"),
             val_none: Value::case(strings.get_or_intern_static("None"), Value::Nothing),
             strings,
@@ -129,7 +142,8 @@ impl<'a> BuiltinBuilder<'a> {
     fn bind(&mut self, name: &'static str, f: impl Fn(Value, &mut Context) -> Value + 'static) {
         let name = self.strings.get_or_intern_static(name);
         let value = Value::builtin(f);
-        self.env = self.env.bind(name, value)
+        self.env = self.env.bind(name, value.clone());
+        self.vm_env = self.vm_env.bind(name, value);
     }
 
     fn bind_opt(&mut self, name: &'static str, f: impl Fn(Value, &mut Context) -> Option<Value> + 'static) {

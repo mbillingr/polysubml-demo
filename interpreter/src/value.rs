@@ -1,10 +1,12 @@
-use crate::interpreter::{Context, Env};
+use crate::compiler::Op;
+use crate::interpreter::Env;
+use crate::{builtins, vm};
 use compiler_lib::ast::StringId;
 use compiler_lib::{Rodeo, ast};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
-type Int = num_bigint::BigInt;
+pub type Int = num_bigint::BigInt;
 
 #[derive(Clone, Debug)]
 pub enum Value {
@@ -19,7 +21,10 @@ pub enum Value {
     Record(Arc<RwLock<HashMap<StringId, Self>>>),
 
     Func(Arc<(ast::LetPattern, ast::Expr, Env)>),
+    Func2(Arc<Vec<Op>>, vm::Env),
     Builtin(Builtin),
+
+    Env(vm::Env),
 
     Vect(im::Vector<Value>),
 }
@@ -89,8 +94,19 @@ impl Value {
         Value::Func(Arc::new((param, expr, env)))
     }
 
-    pub fn builtin(f: impl Fn(Value, &mut Context) -> Value + 'static) -> Value {
+    pub fn func2(body: Arc<Vec<Op>>, env: vm::Env) -> Value {
+        Value::Func2(body, env)
+    }
+
+    pub fn builtin(f: impl Fn(Value, &mut builtins::Context) -> Value + 'static) -> Value {
         Value::Builtin(Builtin(Arc::new(f)))
+    }
+
+    pub fn into_env(self) -> vm::Env {
+        match self {
+            Value::Env(env) => env,
+            _ => unimplemented!(),
+        }
     }
 
     pub fn vect(data: impl Into<im::Vector<Value>>) -> Value {
@@ -151,8 +167,11 @@ impl Value {
             }
 
             Value::Func(_) => "<fun>".to_string(),
+            Value::Func2(_, _) => "<fun>".to_string(),
             //Value::Func(f) => format!("{:?}", f),
             Value::Builtin(_) => "<builtin function>".to_string(),
+
+            Value::Env(_) => "<env>".to_string(),
 
             Value::Vect(v) => {
                 let mut s = String::new();
@@ -237,7 +256,7 @@ impl std::cmp::PartialEq for Value {
 }
 
 #[derive(Clone)]
-pub struct Builtin(pub Arc<dyn Fn(Value, &mut Context) -> Value>);
+pub struct Builtin(pub Arc<dyn Fn(Value, &mut builtins::Context) -> Value>);
 
 impl std::fmt::Debug for Builtin {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
