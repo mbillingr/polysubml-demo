@@ -21,7 +21,7 @@ pub enum Literal {
     Str,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Op {
     Add,
     Sub,

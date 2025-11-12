@@ -4,6 +4,7 @@ mod expand;
 mod expand_imports;
 mod expand_types;
 mod interpreter;
+mod optimize;
 mod value;
 mod vm;
 
@@ -75,30 +76,33 @@ fn exec(
         strings: &mut state.strings,
     };
     let ops = cmp.compile_script(ast.clone());
-    for op in &ops {
-        println!("{:?}", op)
-    }
 
     let t4 = std::time::Instant::now();
-    vm::run_script(&ops, vm_env, &state.strings);
+    let ops = optimize::optimize(ops);
+
+    println!("{:#?}", ops);
 
     let t5 = std::time::Instant::now();
+    vm::run_script(&ops, vm_env, &state.strings);
+
+    let t6 = std::time::Instant::now();
     let mut ctx = interpreter::Context::new(interpreter_state, &mut state.strings);
     for stmt in ast {
         ctx.exec(&stmt);
     }
 
-    let t6 = std::time::Instant::now();
+    let t7 = std::time::Instant::now();
 
-    let t_total = t6 - t0;
+    let t_total = t7 - t0;
     let t_parse = t1 - t0;
     let t_expand = t2 - t1;
     let t_check = t3 - t2;
     let t_compile = t4 - t3;
-    let t_exec = t5 - t4;
-    let t_interpret = t6 - t5;
+    let t_opt = t5 - t4;
+    let t_exec = t6 - t5;
+    let t_interpret = t7 - t6;
     eprintln!(
-        "{t_total:?} : (parse: {t_parse:?}, expand: {t_expand:?}, type-check: {t_check:?}, compile: {t_compile:?}, exec: {t_exec:?}, interpret: {t_interpret:?})"
+        "{t_total:?} : (parse: {t_parse:?}, expand: {t_expand:?}, type-check: {t_check:?}, compile: {t_compile:?}, opt: {t_opt:?}, exec: {t_exec:?}, interpret: {t_interpret:?})"
     );
     Ok(())
 }

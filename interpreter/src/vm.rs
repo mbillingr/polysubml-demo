@@ -17,6 +17,8 @@ fn run(ops: &[Op], stack: &mut Vec<Value>, env: &mut Env, strings: &Rodeo) {
     let mut ip = 0;
     while ip < ops.len() {
         match &ops[ip] {
+            Op::Return => return,
+
             Op::PushConstant(val) => stack.push(val.clone()),
 
             Op::Drop => {

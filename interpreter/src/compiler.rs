@@ -13,6 +13,7 @@ impl<'a> CompilationContext<'a> {
         for stmt in stmts {
             ops = extend(ops, self.compile_statement(stmt));
         }
+        ops = append(ops, Op::Return);
         ops
     }
 
@@ -132,9 +133,12 @@ impl<'a> CompilationContext<'a> {
             }
 
             ast::Expr::FuncDef(fndef) => {
-                let body = extend(
-                    self.compile_pattern_assignment(fndef.param.0),
-                    self.compile_expression(fndef.body.0),
+                let body = append(
+                    extend(
+                        self.compile_pattern_assignment(fndef.param.0),
+                        self.compile_expression(fndef.body.0),
+                    ),
+                    Op::Return,
                 );
                 vec![Op::MakeClosure(Arc::new(body))]
             }
@@ -201,8 +205,12 @@ impl<'a> CompilationContext<'a> {
                     let branch = extend(vec![Op::PeekAndJumpNotTag(tag, skip)], branch);
                     last_branch = extend(branch, last_branch);
                 }
-
-                extend(ops, last_branch)
+                let ops = append(ops, Op::PushEnv);
+                let ops = append(ops, Op::Swap);
+                let ops = extend(ops, last_branch);
+                let ops = append(ops, Op::Swap);
+                let ops = append(ops, Op::PopEnv);
+                ops
             }
 
             ast::Expr::Record(rec) => {
@@ -223,8 +231,11 @@ impl<'a> CompilationContext<'a> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Op {
+    /// Leave the current function
+    Return,
+
     /// Bush a constant value onto the stack
     PushConstant(Value),
 
