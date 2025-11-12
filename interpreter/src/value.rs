@@ -247,8 +247,8 @@ impl std::cmp::PartialEq for Value {
             (Int(a), Int(b)) => a.eq(b),
             (Float(a), Float(b)) => a.eq(b),
             (String(a), String(b)) => Arc::ptr_eq(a, b) || a.eq(b),
-            (Case(a), Case(b)) => Arc::ptr_eq(a, b) || a.eq(b),
-            (Record(a), Record(b)) => Arc::ptr_eq(a, b) || a.read().unwrap().eq(&*b.read().unwrap()),
+            (Case(a), Case(b)) => Arc::ptr_eq(a, b),
+            (Record(a), Record(b)) => Arc::ptr_eq(a, b),
             (Func(a), Func(b)) => Arc::ptr_eq(a, b),
             _ => false,
         }
