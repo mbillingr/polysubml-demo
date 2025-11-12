@@ -354,7 +354,31 @@ CompareExpr = {
     AddExpr,
     CmpOp,
 }
-SCompareExpr = Spanned<CompareExpr>;
+AndExpr = {
+    CompareExpr,
+    Spanned<(<Spanned<AndExpr>> "&&" <Spanned<CompareExpr>>)> => {
+        let ((lhs, rhs), span) = <>;
+        let lhs_span = lhs.1;
+        ast::expr::if_expr(
+            (Box::new(lhs), lhs_span),
+            Box::new(rhs),
+            Box::new((ast::expr::literal(ast::Literal::Bool, ("false".to_string(), span)), span))
+        )
+    }
+}
+OrExpr = {
+    AndExpr,
+    Spanned<(<Spanned<OrExpr>> "||" <Spanned<AndExpr>>)> => {
+        let ((lhs, rhs), span) = <>;
+        let lhs_span = lhs.1;
+        ast::expr::if_expr(
+            (Box::new(lhs), lhs_span),
+            Box::new((ast::expr::literal(ast::Literal::Bool, ("true".to_string(), span)), span)),
+            Box::new(rhs)
+        )
+    }
+}
+SCompareExpr = Spanned<OrExpr>;
 
 //////////////////////////////////////////////////////////////////////
 // Patterns //////////////////////////////////////////////////////////
