@@ -16,7 +16,7 @@ pub enum Value {
     Nothing,
 
     Bool(bool),
-    Int(Int),
+    Int(Rc<Int>),
     Float(f64),
     String(Rc<String>),
 
@@ -84,11 +84,11 @@ impl Value {
     }
 
     pub fn int(i: Int) -> Value {
-        Value::Int(i)
+        Value::Int(Rc::new(i))
     }
 
     pub fn usize(i: usize) -> Value {
-        Value::Int(i.into())
+        Value::Int(Rc::new(i.into()))
     }
 
     pub fn as_int(&self) -> &Int {
@@ -253,45 +253,6 @@ impl std::fmt::Display for Func {
         }
     }
 }
-
-macro_rules! impl_binop {
-    ($tr:ident, $op:ident, $($vs:ident),*) => {
-        impl std::ops::$tr for Value {
-            type Output = Value;
-
-            fn $op(self, rhs: Self) -> Self::Output {
-                use Value::*;
-                match (self, rhs) {
-                    $(
-                        ($vs(a), $vs(b)) => $vs(a.$op(b)),
-                    )*
-                    _ => unimplemented!(),
-                }
-            }
-        }
-    }
-}
-
-impl_binop!(Sub, sub, Int, Float);
-impl_binop!(Mul, mul, Int, Float);
-impl_binop!(Div, div, Int, Float);
-impl_binop!(Rem, rem, Int, Float);
-
-// Don't use the macro for + because we need to handle string concatenation
-impl std::ops::Add for Value {
-    type Output = Value;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        use Value::*;
-        match (self, rhs) {
-            (Int(a), Int(b)) => Int(a.add(b)),
-            (Float(a), Float(b)) => Float(a.add(b)),
-            (String(a), String(b)) => Value::string((*a).clone().add(&b)),
-            _ => unimplemented!(),
-        }
-    }
-}
-
 impl std::cmp::PartialOrd for Value {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         use Value::*;
