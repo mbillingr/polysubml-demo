@@ -6,7 +6,6 @@ use compiler_lib::{Rodeo, ast};
 use im_rc::Vector;
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::fmt::Formatter;
 use std::rc::Rc;
 
@@ -22,13 +21,43 @@ pub enum Value {
     String(Rc<String>),
 
     Case(Rc<(StringId, Self)>),
-    Record(Rc<RefCell<FxHashMap<StringId, Self>>>),
+    Record(Rc<FxHashMap<StringId, Field>>),
 
     Callable(Rc<Func>),
 
     Env(vm::Env),
 
     Vect(Vector<Value>),
+}
+
+#[derive(Clone, Debug)]
+pub enum Field {
+    Imm(Value),
+    Mut(RefCell<Value>),
+}
+
+impl Field {
+    fn immutable(val: Value) -> Self {
+        Field::Imm(val)
+    }
+
+    fn mutable(val: Value) -> Self {
+        Field::Mut(RefCell::new(val))
+    }
+
+    fn get(&self) -> Value {
+        match self {
+            Field::Imm(v) => v.clone(),
+            Field::Mut(v) => v.borrow().clone(),
+        }
+    }
+
+    fn set(&self, val: Value) -> Value {
+        match self {
+            Field::Imm(_) => panic!("Cannot set immutable field"),
+            Field::Mut(v) => std::mem::replace(&mut *v.borrow_mut(), val),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -103,8 +132,12 @@ impl Value {
         Value::Case(Rc::new((tag, val)))
     }
 
-    pub fn record(fields: impl Iterator<Item = (StringId, Value)>) -> Value {
-        Value::Record(Rc::new(RefCell::new(fields.collect())))
+    pub fn record(fields: impl Iterator<Item = (StringId, Value, bool)>) -> Value {
+        Value::Record(Rc::new(
+            fields
+                .map(|(k, v, m)| if m { (k, Field::mutable(v)) } else { (k, Field::immutable(v)) })
+                .collect(),
+        ))
     }
 
     pub fn func(param: ast::LetPattern, expr: ast::Expr, env: Env) -> Value {
@@ -159,17 +192,14 @@ impl Value {
 
     pub fn get_field(&self, field: StringId) -> Value {
         match self {
-            Value::Record(rec) => rec.borrow().get(&field).cloned().unwrap(),
+            Value::Record(rec) => rec.get(&field).unwrap().get(),
             _ => unimplemented!(),
         }
     }
 
     pub fn set_field(&self, field: StringId, val: Value) -> Value {
         match self {
-            Value::Record(rec) => {
-                let mut lock = rec.borrow_mut();
-                std::mem::replace(lock.get_mut(&field).unwrap(), val)
-            }
+            Value::Record(rec) => rec.get(&field).unwrap().set(val),
             _ => unimplemented!(),
         }
     }
@@ -187,8 +217,8 @@ impl Value {
             Value::Record(fields) => {
                 let mut s = String::new();
                 s.push('{');
-                for (n, v) in fields.borrow().iter() {
-                    s.push_str(&format!("{}={}; ", r.resolve(n), v.show(r)));
+                for (n, v) in fields.iter() {
+                    s.push_str(&format!("{}={}; ", r.resolve(n), v.get().show(r)));
                 }
                 s.push('}');
                 s

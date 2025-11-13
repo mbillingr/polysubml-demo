@@ -197,7 +197,9 @@ impl<'a> Context<'a> {
                 unimplemented!()
             }
 
-            ast::Expr::Record(rec) => Value::record(rec.fields.iter().map(|field| (field.0.0, self.eval(&field.1.0)))),
+            ast::Expr::Record(rec) => {
+                Value::record(rec.fields.iter().map(|field| (field.0.0, self.eval(&field.1.0), field.2)))
+            }
 
             ast::Expr::Typed(tx) => self.eval(&tx.expr.0),
 

@@ -216,8 +216,8 @@ impl<'a> CompilationContext<'a> {
             ast::Expr::Record(rec) => {
                 let mut ops = vec![];
                 let mut fields = Vec::with_capacity(rec.fields.len());
-                for ((fld, _), val, _, _) in rec.fields {
-                    fields.push(fld);
+                for ((fld, _), val, is_mut, _) in rec.fields {
+                    fields.push((fld, is_mut));
                     ops = extend(ops, self.compile_expression(val.0));
                 }
                 ops.push(Op::MakeRecord(fields));
@@ -273,7 +273,7 @@ pub enum Op {
     UnwrapCase,
 
     /// Pop a value for each field from the stack and push a record
-    MakeRecord(Vec<StringId>),
+    MakeRecord(Vec<(StringId, bool)>),
 
     /// Pop a record from the stack and push the field's value
     GetField(StringId),

@@ -72,7 +72,7 @@ fn run(ops: &[Op], stack: &mut Vec<Value>, env: &mut Env, strings: &Rodeo) {
             }
 
             Op::MakeRecord(fields) => {
-                let rec = Value::record(fields.iter().rev().map(|f| (*f, stack.pop().unwrap())));
+                let rec = Value::record(fields.iter().rev().map(|(f, m)| (*f, stack.pop().unwrap(), *m)));
                 stack.push(rec);
             }
 
