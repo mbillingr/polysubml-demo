@@ -3,9 +3,11 @@ use crate::interpreter::Env;
 use crate::{builtins, vm};
 use compiler_lib::ast::StringId;
 use compiler_lib::{Rodeo, ast};
+use im_rc::Vector;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::Formatter;
-use std::sync::{Arc, RwLock};
+use std::rc::Rc;
 
 pub type Int = num_bigint::BigInt;
 
@@ -16,22 +18,22 @@ pub enum Value {
     Bool(bool),
     Int(Int),
     Float(f64),
-    String(Arc<String>),
+    String(Rc<String>),
 
-    Case(Arc<(StringId, Self)>),
-    Record(Arc<RwLock<HashMap<StringId, Self>>>),
+    Case(Rc<(StringId, Self)>),
+    Record(Rc<RefCell<HashMap<StringId, Self>>>),
 
-    Callable(Arc<Func>),
+    Callable(Rc<Func>),
 
     Env(vm::Env),
 
-    Vect(im::Vector<Value>),
+    Vect(Vector<Value>),
 }
 
 #[derive(Debug)]
 pub enum Func {
     Func(ast::LetPattern, ast::Expr, Env),
-    Func2(Arc<Vec<Op>>, vm::Env),
+    Func2(Rc<Vec<Op>>, vm::Env),
     Builtin(Builtin),
 }
 
@@ -82,10 +84,10 @@ impl Value {
     }
 
     pub fn string(s: String) -> Value {
-        Value::arc_str(Arc::new(s))
+        Value::rc_str(Rc::new(s))
     }
 
-    pub fn arc_str(s: Arc<String>) -> Value {
+    pub fn rc_str(s: Rc<String>) -> Value {
         Value::String(s)
     }
 
@@ -97,23 +99,23 @@ impl Value {
     }
 
     pub fn case(tag: StringId, val: Self) -> Value {
-        Value::Case(Arc::new((tag, val)))
+        Value::Case(Rc::new((tag, val)))
     }
 
     pub fn record(fields: impl Iterator<Item = (StringId, Value)>) -> Value {
-        Value::Record(Arc::new(RwLock::new(fields.collect())))
+        Value::Record(Rc::new(RefCell::new(fields.collect())))
     }
 
     pub fn func(param: ast::LetPattern, expr: ast::Expr, env: Env) -> Value {
-        Value::Callable(Arc::new(Func::Func(param, expr, env)))
+        Value::Callable(Rc::new(Func::Func(param, expr, env)))
     }
 
-    pub fn func2(body: Arc<Vec<Op>>, env: vm::Env) -> Value {
-        Value::Callable(Arc::new(Func::Func2(body, env)))
+    pub fn func2(body: Rc<Vec<Op>>, env: vm::Env) -> Value {
+        Value::Callable(Rc::new(Func::Func2(body, env)))
     }
 
     pub fn builtin(f: impl Fn(Value, &mut builtins::Context) -> Value + 'static) -> Value {
-        Value::Callable(Arc::new(Func::Builtin(Builtin(Box::new(f)))))
+        Value::Callable(Rc::new(Func::Builtin(Builtin(Box::new(f)))))
     }
 
     pub fn as_func(&self) -> &Func {
@@ -134,11 +136,11 @@ impl Value {
         }
     }
 
-    pub fn vect(data: impl Into<im::Vector<Value>>) -> Value {
+    pub fn vect(data: impl Into<Vector<Value>>) -> Value {
         Value::Vect(data.into())
     }
 
-    pub fn as_vect(&self) -> &im::Vector<Value> {
+    pub fn as_vect(&self) -> &Vector<Value> {
         match self {
             Value::Vect(v) => v,
             _ => unimplemented!(),
@@ -156,7 +158,7 @@ impl Value {
 
     pub fn get_field(&self, field: StringId) -> Value {
         match self {
-            Value::Record(rec) => rec.read().unwrap().get(&field).cloned().unwrap(),
+            Value::Record(rec) => rec.borrow().get(&field).cloned().unwrap(),
             _ => unimplemented!(),
         }
     }
@@ -164,7 +166,7 @@ impl Value {
     pub fn set_field(&self, field: StringId, val: Value) -> Value {
         match self {
             Value::Record(rec) => {
-                let mut lock = rec.write().unwrap();
+                let mut lock = rec.borrow_mut();
                 std::mem::replace(lock.get_mut(&field).unwrap(), val)
             }
             _ => unimplemented!(),
@@ -184,7 +186,7 @@ impl Value {
             Value::Record(fields) => {
                 let mut s = String::new();
                 s.push('{');
-                for (n, v) in fields.read().unwrap().iter() {
+                for (n, v) in fields.borrow().iter() {
                     s.push_str(&format!("{}={}; ", r.resolve(n), v.show(r)));
                 }
                 s.push('}');
@@ -278,10 +280,10 @@ impl PartialEq for Value {
             (Bool(a), Bool(b)) => a.eq(b),
             (Int(a), Int(b)) => a.eq(b),
             (Float(a), Float(b)) => a.eq(b),
-            (String(a), String(b)) => Arc::ptr_eq(a, b) || a.eq(b),
-            (Case(a), Case(b)) => Arc::ptr_eq(a, b),
-            (Record(a), Record(b)) => Arc::ptr_eq(a, b),
-            (Callable(a), Callable(b)) => Arc::ptr_eq(a, b),
+            (String(a), String(b)) => Rc::ptr_eq(a, b) || a.eq(b),
+            (Case(a), Case(b)) => Rc::ptr_eq(a, b),
+            (Record(a), Record(b)) => Rc::ptr_eq(a, b),
+            (Callable(a), Callable(b)) => Rc::ptr_eq(a, b),
             _ => false,
         }
     }

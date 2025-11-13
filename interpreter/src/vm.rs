@@ -3,7 +3,7 @@ use crate::value::{Func, Value};
 use compiler_lib::ast::StringId;
 use compiler_lib::{Rodeo, ast};
 use std::cell::RefCell;
-use std::sync::Arc;
+use std::rc::Rc;
 
 pub fn run_script(script: &[Op], env: &mut Env, strings: &Rodeo) {
     let mut stack = vec![];
@@ -218,8 +218,8 @@ fn run(ops: &[Op], stack: &mut Vec<Value>, env: &mut Env, strings: &Rodeo) {
 #[derive(Clone, Debug)]
 pub enum Env {
     Empty,
-    Entry(Arc<(StringId, Value, Env)>),
-    Lazy(Arc<(StringId, RefCell<Option<Value>>, Env)>),
+    Entry(Rc<(StringId, Value, Env)>),
+    Lazy(Rc<(StringId, RefCell<Option<Value>>, Env)>),
 }
 
 impl Env {
@@ -228,7 +228,7 @@ impl Env {
     }
 
     pub fn bind(&self, name: StringId, value: Value) -> Env {
-        Env::Entry(Arc::new((name, value, self.clone())))
+        Env::Entry(Rc::new((name, value, self.clone())))
     }
 
     fn lookup(&self, name: StringId) -> Option<Value> {
@@ -259,7 +259,7 @@ impl Env {
     }
 
     fn bind_placeholder(&self, name: StringId) -> Env {
-        Env::Lazy(Arc::new((name, RefCell::new(None), self.clone())))
+        Env::Lazy(Rc::new((name, RefCell::new(None), self.clone())))
     }
 
     fn set_placeholder(&self, name: StringId, value: Value) {

@@ -1,6 +1,6 @@
 use crate::compiler::Op;
 use std::collections::{BTreeSet, HashSet};
-use std::sync::Arc;
+use std::rc::Rc;
 
 /// Optimize a block of code.
 pub fn optimize(ops: Vec<Op>) -> Vec<Op> {
@@ -18,7 +18,7 @@ pub fn optimize(ops: Vec<Op>) -> Vec<Op> {
 fn optimize_functions(mut ops: Vec<Op>) -> Vec<Op> {
     for op in &mut ops {
         match op {
-            Op::MakeClosure(body) => *body = Arc::new(optimize((**body).clone())),
+            Op::MakeClosure(body) => *body = Rc::new(optimize((**body).clone())),
             _ => {}
         }
     }

@@ -1,7 +1,7 @@
 use crate::value::Value;
 use compiler_lib::ast::StringId;
 use compiler_lib::{Rodeo, ast};
-use std::sync::Arc;
+use std::rc::Rc;
 
 pub struct CompilationContext<'a> {
     pub strings: &'a mut Rodeo,
@@ -140,7 +140,7 @@ impl<'a> CompilationContext<'a> {
                     ),
                     Op::Return,
                 );
-                vec![Op::MakeClosure(Arc::new(body))]
+                vec![Op::MakeClosure(Rc::new(body))]
             }
 
             ast::Expr::If(if_) => {
@@ -312,7 +312,7 @@ pub enum Op {
     Call,
 
     /// Capture the current environment and push a function on the stack
-    MakeClosure(Arc<Vec<Op>>),
+    MakeClosure(Rc<Vec<Op>>),
 
     /// Pop n values from the stack and print them
     Println(usize),
