@@ -4,6 +4,7 @@ use crate::{builtins, vm};
 use compiler_lib::ast::StringId;
 use compiler_lib::{Rodeo, ast};
 use im_rc::Vector;
+use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::Formatter;
@@ -21,7 +22,7 @@ pub enum Value {
     String(Rc<String>),
 
     Case(Rc<(StringId, Self)>),
-    Record(Rc<RefCell<HashMap<StringId, Self>>>),
+    Record(Rc<RefCell<FxHashMap<StringId, Self>>>),
 
     Callable(Rc<Func>),
 
