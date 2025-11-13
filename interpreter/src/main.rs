@@ -5,6 +5,8 @@ mod expand_imports;
 mod expand_types;
 mod interpreter;
 mod optimize;
+mod to_rust;
+mod to_rust2;
 mod value;
 mod vm;
 
@@ -80,7 +82,16 @@ fn exec(
     let t4 = std::time::Instant::now();
     let ops = optimize::optimize(ops);
 
-    println!("{:#?}", ops);
+    //println!("{:#?}", ops);
+    //to_rust::to_rust(&ops, &state.strings);
+
+    /*println!(
+        "{}",
+        to_rust2::CompilationContext {
+            strings: &mut state.strings,
+        }
+        .compile_script(ast.clone())
+    );*/
 
     let t5 = std::time::Instant::now();
     vm::run_script(&ops, vm_env, &state.strings);

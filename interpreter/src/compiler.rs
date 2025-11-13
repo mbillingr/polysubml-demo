@@ -308,7 +308,7 @@ pub enum Op {
     /// Pop two values from the stack and push the result back
     AnyOp(ast::Op),
 
-    /// Pop a function and an argument (arg below f on top) from the stack and push the result back
+    /// Pop a function and an argument (f below arg on top) from the stack and push the result back
     Call,
 
     /// Capture the current environment and push a function on the stack

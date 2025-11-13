@@ -48,7 +48,7 @@ pub fn define_builtins(env: Env, vm_env: vm::Env, strings: &mut Rodeo) -> (Env, 
 
     bb.bind("__write_str", |s, _| {
         print!("{}", s.as_str());
-        Value::Nothing
+        Value::nothing()
     });
 
     bb.bind_opt("__chars", |s, _| {
@@ -77,7 +77,7 @@ pub fn define_builtins(env: Env, vm_env: vm::Env, strings: &mut Rodeo) -> (Env, 
     bb.bind("__float_to_str", |x, _| Value::string(x.as_float().to_string()));
 
     bb.bind("__vec_new", |_, _| Value::vect(vec![]));
-    bb.bind("__vec_length", move |vec, _| Value::int(vec.as_vect().len().into()));
+    bb.bind("__vec_length", move |vec, _| Value::usize(vec.as_vect().len().into()));
     bb.bind("__vec_push_back", move |args, _| {
         let mut v = args.get_field(idx0).as_vect().clone();
         let x = args.get_field(idx1);
@@ -134,7 +134,7 @@ impl<'a> BuiltinBuilder<'a> {
             env,
             vm_env,
             tag_some: strings.get_or_intern_static("Some"),
-            val_none: Value::case(strings.get_or_intern_static("None"), Value::Nothing),
+            val_none: Value::case(strings.get_or_intern_static("None"), Value::nothing()),
             strings,
         }
     }

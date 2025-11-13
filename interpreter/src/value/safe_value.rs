@@ -4,6 +4,7 @@ use crate::{builtins, vm};
 use compiler_lib::ast::StringId;
 use compiler_lib::{Rodeo, ast};
 use std::collections::HashMap;
+use std::fmt::Formatter;
 use std::sync::{Arc, RwLock};
 
 pub type Int = num_bigint::BigInt;
@@ -20,16 +21,25 @@ pub enum Value {
     Case(Arc<(StringId, Self)>),
     Record(Arc<RwLock<HashMap<StringId, Self>>>),
 
-    Func(Arc<(ast::LetPattern, ast::Expr, Env)>),
-    Func2(Arc<Vec<Op>>, vm::Env),
-    Builtin(Builtin),
+    Callable(Arc<Func>),
 
     Env(vm::Env),
 
     Vect(im::Vector<Value>),
 }
 
+#[derive(Debug)]
+pub enum Func {
+    Func(ast::LetPattern, ast::Expr, Env),
+    Func2(Arc<Vec<Op>>, vm::Env),
+    Builtin(Builtin),
+}
+
 impl Value {
+    pub fn nothing() -> Value {
+        Value::Nothing
+    }
+
     pub fn bool(b: bool) -> Value {
         Value::Bool(b)
     }
@@ -43,6 +53,10 @@ impl Value {
 
     pub fn int(i: Int) -> Value {
         Value::Int(i)
+    }
+
+    pub fn usize(i: usize) -> Value {
+        Value::Int(i.into())
     }
 
     pub fn as_int(&self) -> &Int {
@@ -91,15 +105,26 @@ impl Value {
     }
 
     pub fn func(param: ast::LetPattern, expr: ast::Expr, env: Env) -> Value {
-        Value::Func(Arc::new((param, expr, env)))
+        Value::Callable(Arc::new(Func::Func(param, expr, env)))
     }
 
     pub fn func2(body: Arc<Vec<Op>>, env: vm::Env) -> Value {
-        Value::Func2(body, env)
+        Value::Callable(Arc::new(Func::Func2(body, env)))
     }
 
     pub fn builtin(f: impl Fn(Value, &mut builtins::Context) -> Value + 'static) -> Value {
-        Value::Builtin(Builtin(Arc::new(f)))
+        Value::Callable(Arc::new(Func::Builtin(Builtin(Box::new(f)))))
+    }
+
+    pub fn as_func(&self) -> &Func {
+        match self {
+            Value::Callable(f) => f,
+            _ => unimplemented!(),
+        }
+    }
+
+    pub fn env(env: vm::Env) -> Self {
+        Value::Env(env)
     }
 
     pub fn into_env(self) -> vm::Env {
@@ -166,10 +191,7 @@ impl Value {
                 s
             }
 
-            Value::Func(_) => "<fun>".to_string(),
-            Value::Func2(_, _) => "<fun>".to_string(),
-            //Value::Func(f) => format!("{:?}", f),
-            Value::Builtin(_) => "<builtin function>".to_string(),
+            Value::Callable(f) => f.to_string(),
 
             Value::Env(_) => "<env>".to_string(),
 
@@ -185,6 +207,16 @@ impl Value {
                 s.push(']');
                 s
             }
+        }
+    }
+}
+
+impl std::fmt::Display for Func {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Func::Func(_, _, _) => write!(f, "<fun>"),
+            Func::Func2(_, _) => write!(f, "<fun>"),
+            Func::Builtin(_) => write!(f, "<builtin function>"),
         }
     }
 }
@@ -207,6 +239,11 @@ macro_rules! impl_binop {
     }
 }
 
+impl_binop!(Sub, sub, Int, Float);
+impl_binop!(Mul, mul, Int, Float);
+impl_binop!(Div, div, Int, Float);
+impl_binop!(Rem, rem, Int, Float);
+
 // Don't use the macro for + because we need to handle string concatenation
 impl std::ops::Add for Value {
     type Output = Value;
@@ -222,11 +259,6 @@ impl std::ops::Add for Value {
     }
 }
 
-impl_binop!(Sub, sub, Int, Float);
-impl_binop!(Mul, mul, Int, Float);
-impl_binop!(Div, div, Int, Float);
-impl_binop!(Rem, rem, Int, Float);
-
 impl std::cmp::PartialOrd for Value {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         use Value::*;
@@ -239,7 +271,7 @@ impl std::cmp::PartialOrd for Value {
     }
 }
 
-impl std::cmp::PartialEq for Value {
+impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
         use Value::*;
         match (self, other) {
@@ -249,14 +281,13 @@ impl std::cmp::PartialEq for Value {
             (String(a), String(b)) => Arc::ptr_eq(a, b) || a.eq(b),
             (Case(a), Case(b)) => Arc::ptr_eq(a, b),
             (Record(a), Record(b)) => Arc::ptr_eq(a, b),
-            (Func(a), Func(b)) => Arc::ptr_eq(a, b),
+            (Callable(a), Callable(b)) => Arc::ptr_eq(a, b),
             _ => false,
         }
     }
 }
 
-#[derive(Clone)]
-pub struct Builtin(pub Arc<dyn Fn(Value, &mut builtins::Context) -> Value>);
+pub struct Builtin(pub Box<dyn Fn(Value, &mut builtins::Context) -> Value>);
 
 impl std::fmt::Debug for Builtin {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

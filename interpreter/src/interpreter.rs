@@ -1,6 +1,6 @@
 use crate::builtins;
-use crate::value::Builtin;
 use crate::value::Value;
+use crate::value::{Builtin, Func};
 use compiler_lib::ast::StringId;
 use compiler_lib::{Rodeo, ast};
 use std::borrow::Cow;
@@ -61,9 +61,35 @@ impl<'a> Context<'a> {
     pub fn eval(&mut self, expr: &ast::Expr) -> Value {
         match expr {
             ast::Expr::BinOp(bop) => {
+                use ast::Literal::*;
+                use ast::Op::*;
                 let lhs = self.eval(&bop.lhs.0);
                 let rhs = self.eval(&bop.rhs.0);
-                match bop.op {
+                match (&bop.op_type.0, &bop.op) {
+                    (None, Eq) => Value::bool(lhs == rhs),
+                    (None, Neq) => Value::bool(lhs == rhs),
+                    (Some(Int), Lt) => Value::bool(lhs.as_int() < rhs.as_int()),
+                    (Some(Int), Lte) => Value::bool(lhs.as_int() <= rhs.as_int()),
+                    (Some(Int), Gt) => Value::bool(lhs.as_int() > rhs.as_int()),
+                    (Some(Int), Gte) => Value::bool(lhs.as_int() >= rhs.as_int()),
+                    (Some(Int), Add) => Value::int(lhs.as_int() + rhs.as_int()),
+                    (Some(Int), Sub) => Value::int(lhs.as_int() - rhs.as_int()),
+                    (Some(Int), Mult) => Value::int(lhs.as_int() * rhs.as_int()),
+                    (Some(Int), Div) => Value::int(lhs.as_int() / rhs.as_int()),
+                    (Some(Int), Rem) => Value::int(lhs.as_int() % rhs.as_int()),
+                    (Some(Float), Lt) => Value::bool(lhs.as_float() < rhs.as_float()),
+                    (Some(Float), Lte) => Value::bool(lhs.as_float() <= rhs.as_float()),
+                    (Some(Float), Gt) => Value::bool(lhs.as_float() > rhs.as_float()),
+                    (Some(Float), Gte) => Value::bool(lhs.as_float() >= rhs.as_float()),
+                    (Some(Float), Add) => Value::float(lhs.as_float() + rhs.as_float()),
+                    (Some(Float), Sub) => Value::float(lhs.as_float() - rhs.as_float()),
+                    (Some(Float), Mult) => Value::float(lhs.as_float() * rhs.as_float()),
+                    (Some(Float), Div) => Value::float(lhs.as_float() / rhs.as_float()),
+                    (Some(Float), Rem) => Value::float(lhs.as_float() % rhs.as_float()),
+                    (Some(Str), Add) => Value::string(lhs.as_str().to_string() + rhs.as_str()),
+                    other => todo!("{other:?}"),
+                }
+                /*match bop.op {
                     ast::Op::Add => lhs + rhs,
                     ast::Op::Sub => lhs - rhs,
                     ast::Op::Mult => lhs * rhs,
@@ -77,7 +103,7 @@ impl<'a> Context<'a> {
 
                     ast::Op::Eq => Value::bool(lhs == rhs),
                     ast::Op::Neq => Value::bool(lhs != rhs),
-                }
+                }*/
             }
 
             ast::Expr::Block(block) => {
@@ -98,18 +124,16 @@ impl<'a> Context<'a> {
                     func = self.eval(&call.func.0);
                     arg = self.eval(&call.arg.0);
                 }
-                match func {
-                    Value::Func(f) => {
-                        let pat = &f.0;
-                        let cls = &f.2;
+                match func.as_func() {
+                    Func::Func(pat, body, cls) => {
                         let val = Cow::Owned(arg);
                         let local_env = match_pattern(pat, val, cls).unwrap();
                         let old_env = std::mem::replace(&mut self.state.env, local_env);
-                        let result = self.eval(&f.1);
+                        let result = self.eval(body);
                         self.state.env = old_env;
                         result
                     }
-                    Value::Builtin(Builtin(f)) => f(arg, &mut builtins::Context { strings: self.strings }),
+                    Func::Builtin(Builtin(f)) => f(arg, &mut builtins::Context { strings: self.strings }),
                     _ => panic!("not callable: {:?}", func),
                 }
             }

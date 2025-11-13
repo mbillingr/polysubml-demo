@@ -1,5 +1,5 @@
 use crate::compiler::Op;
-use crate::value::Value;
+use crate::value::{Func, Value};
 use compiler_lib::ast::StringId;
 use compiler_lib::{Rodeo, ast};
 use std::cell::RefCell;
@@ -56,7 +56,7 @@ fn run(ops: &[Op], stack: &mut Vec<Value>, env: &mut Env, strings: &Rodeo) {
                 env.set_placeholder(*var, val);
             }
 
-            Op::PushEnv => stack.push(Value::Env(env.clone())),
+            Op::PushEnv => stack.push(Value::env(env.clone())),
 
             Op::PopEnv => *env = stack.pop().unwrap().into_env(),
 
@@ -192,9 +192,9 @@ fn run(ops: &[Op], stack: &mut Vec<Value>, env: &mut Env, strings: &Rodeo) {
                 // stack: [... fun arg]
                 let fun = stack.swap_remove(stack.len() - 2);
                 // stack: [... arg]
-                match fun {
-                    Value::Func2(f, mut e) => run(&f, stack, &mut e, strings),
-                    Value::Builtin(f) => {
+                match fun.as_func() {
+                    Func::Func2(f, e) => run(&f, stack, &mut e.clone(), strings),
+                    Func::Builtin(f) => {
                         let arg = stack.pop().unwrap();
                         let result = f.0(arg, &mut strings.into());
                         stack.push(result);

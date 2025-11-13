@@ -63,7 +63,6 @@ struct BasicBlock(Vec<Op>);
 
 impl BasicBlock {
     fn new(ops: Vec<Op>) -> Self {
-        debug_assert!(ops.last().filter(|op| is_exit(*op)).is_some());
         debug_assert!(!ops.iter().rev().skip(1).any(is_exit));
         Self(ops)
     }
@@ -79,7 +78,7 @@ fn is_exit(op: &Op) -> bool {
 /// Peephole optimization of a basic block
 fn peephole(BasicBlock(ops): BasicBlock) -> BasicBlock {
     let mut out = vec![];
-    for op in dbg!(ops) {
+    for op in ops {
         out.push(op);
 
         loop {
@@ -90,10 +89,9 @@ fn peephole(BasicBlock(ops): BasicBlock) -> BasicBlock {
                     out.push(Op::Dup)
                 }
 
-                _ => break
+                _ => break,
             }
         }
-
     }
     BasicBlock::new(out)
 }
