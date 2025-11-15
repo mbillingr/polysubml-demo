@@ -53,6 +53,39 @@ let rec is_empty =
     and reverse = fun (type a) (xs : <<list a>>) : (<<list a>>) ->
       foldl ((fun (rs, r) -> cons (r, rs)), nil, xs)
 
+    and merge_sorted = fun (type a) (cmp : ((a*a)->bool), xs : <<list a>>, ys : <<list a>>) : (<<list a>>) ->
+        let vars = {mut xs; mut ys; mut acc=nil} in
+        loop (
+            let xo = __vec_peek_back vars.xs;
+            let yo = __vec_peek_back vars.ys;
+            let choice = match xo with
+              | `None _ ->
+                (match yo with
+                  | `None _ -> `Break vars.acc
+                  | `Some y -> `Y y)
+              | `Some x ->
+                (match yo with
+                  | `None _ -> `X x
+                  | `Some y -> (if cmp(y, x) then `X x else `Y y));
+            match choice with
+              | `X x -> (
+                vars.acc <- cons(x, vars.acc);
+                vars.xs <- __vec_pop_back vars.xs;
+                `Continue {}
+              )
+              | `Y y -> (
+                vars.acc <- cons(y, vars.acc);
+                vars.ys <- __vec_pop_back vars.ys;
+                `Continue {}
+              )
+              | other -> other
+        )
+
+    and sort = fun (type a) (cmp : ((a*a)->bool), xs : <<list a>>) : (<<list a>>) ->
+        if __vec_length xs < 2 then xs else
+        let (lhs, rhs) = __vec_split(xs, (__vec_length xs) / 2) in
+            merge_sorted(cmp, sort(cmp, lhs), sort(cmp, rhs))
+
     and collect_rev = fun (type a) (it: <<iter a>>) : (<<list a>>) -> (
       let vars = {mut out = nil};
       loop
@@ -70,5 +103,5 @@ let rec is_empty =
 ;
 
 {
-  nil; is_empty; cons; head; foldl; foldr; map; filter; append; reverse; collect_rev; collect
+  nil; is_empty; cons; head; foldl; foldr; map; filter; append; reverse; sort; merge_sorted; collect_rev; collect
 }

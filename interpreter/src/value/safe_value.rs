@@ -132,9 +132,10 @@ impl Value {
         Value::Case(Rc::new((tag, val)))
     }
 
-    pub fn record(fields: impl Iterator<Item = (StringId, Value, bool)>) -> Value {
+    pub fn record(fields: impl IntoIterator<Item = (StringId, Value, bool)>) -> Value {
         Value::Record(Rc::new(
             fields
+                .into_iter()
                 .map(|(k, v, m)| if m { (k, Field::mutable(v)) } else { (k, Field::immutable(v)) })
                 .collect(),
         ))

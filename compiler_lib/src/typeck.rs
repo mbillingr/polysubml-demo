@@ -121,6 +121,7 @@ impl TypeckState {
             smgr,
             strings,
         );
+        self.declare_builtin("__vec_split", "type a. (vec@a) * int -> (vec@a) * (vec@a)", smgr, strings);
 
         self.bindings.make_permanent(n);
     }
