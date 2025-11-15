@@ -1,39 +1,45 @@
-let type <<list t>> = rec list = [`Some t * list | `None any];
+let type <<list t>> = vec@t;
 let type <<iter t>> = any -> [`Some t | `None any];
 
-let nil: <<list never>> = `None {};
+let nil: (vec@never) = __vec_new {};
 
 let rec is_empty =
-          fun lst -> match lst with
-            | `None _ -> true
-            | `Some _ -> false
+          fun lst -> (__vec_length lst) == 0
 
-    and cons = fun (type t u) (hd:t, tl:u) : [`Some t * u] ->
-      `Some (hd, tl)
+    and cons = fun (type a) (hd:a, tl:(vec@a)) : (vec@a) ->
+      __vec_push_front(tl, hd)
 
-    and head = fun (type a) (lst : <<list a>>) : a ->
-      match lst with
+    and head = fun (type a) (lst : (vec@a)) : a ->
+      match __vec_peek_front lst with
         | `None _ -> panic "empty list"
-        | `Some (h, _) -> h
+        | `Some h -> h
 
-    and tail = fun (type a) (lst : <<list a>>) : (<<list a>>) ->
-      match lst with
-        | `None _ -> panic "empty list"
-        | `Some (_, t) -> t
+    and tail = fun (type a) (lst : (vec@a)) : (vec@a) ->
+      if is_empty lst
+      then panic "empty list"
+      else __vec_pop_front lst
 
     and foldl = fun (type a b) (f : (b*a)->b, init : b, lst : <<list a>>) : b ->
-      let rec inner = fun (acc, lst) ->
-        match lst with
-          | `None _ -> acc
-          | `Some (x, xs) -> inner (f (acc, x), xs)
-      in inner (init, lst)
+      let vars = {mut acc=init; mut xs=lst} in
+      loop
+        match __vec_peek_front vars.xs with
+          | `None _ -> `Break vars.acc
+          | `Some x -> begin
+              vars.acc <- f(vars.acc, x);
+              vars.xs <- __vec_pop_front vars.xs;
+              `Continue {}
+            end
 
-    and foldr = fun (type a b) (f : (a*b)->b, init : b, lst : <<list a>> ) : b ->
-      let rec inner = fun lst ->
-        match lst with
-          | `None _ -> init
-          | `Some (x, xs) -> f (x, inner xs)
-      in inner lst
+    and foldr = fun (type a b) (f : (a*b)->b, init : b, lst : <<list a>>) : b ->
+      let vars = {mut acc=init; mut xs=lst} in
+      loop
+        match __vec_peek_back vars.xs with
+          | `None _ -> `Break vars.acc
+          | `Some x -> begin
+              vars.acc <- f(x, vars.acc);
+              vars.xs <- __vec_pop_back vars.xs;
+              `Continue {}
+            end
 
     and map = fun (type a b) (f : a->b, lst : <<list a>>) : (<<list b>>) ->
       foldr ((fun (h, t) -> cons (f h, t)), nil, lst)

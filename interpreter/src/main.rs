@@ -94,8 +94,8 @@ fn exec(
         .compile_script(ast.clone())
     );*/
 
-    let py = to_python::CompilationContext::new(&mut state.strings).compile_script(ast.clone());
-    println!("{}", dbg!(py).into_python_src(0, false, &mut state.strings));
+    /*let py = to_python::CompilationContext::new(&mut state.strings).compile_script(ast.clone());
+    println!("{}", dbg!(py).into_python_src(0, false, &mut state.strings));*/
 
     let t5 = std::time::Instant::now();
     vm::run_script(&ops, vm_env, &state.strings);
