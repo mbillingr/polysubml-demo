@@ -3,6 +3,7 @@ mod compiler;
 mod expand;
 mod expand_imports;
 mod expand_types;
+mod free_vars;
 mod interpreter;
 mod optimize;
 mod to_python;
@@ -86,13 +87,7 @@ fn exec(
     //println!("{:#?}", ops);
     //to_rust::to_rust(&ops, &state.strings);
 
-    /*println!(
-        "{}",
-        to_rust2::CompilationContext {
-            strings: &mut state.strings,
-        }
-        .compile_script(ast.clone())
-    );*/
+    std::fs::write("last_compiled/src/main.rs", to_rust2::CompilationContext::new(&mut state.strings).compile_script(ast.clone())).unwrap();
 
     /*let py = to_python::CompilationContext::new(&mut state.strings).compile_script(ast.clone());
     println!("{}", dbg!(py).into_python_src(0, false, &mut state.strings));*/

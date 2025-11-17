@@ -5,7 +5,6 @@ use compiler_lib::Rodeo;
 use compiler_lib::ast::StringId;
 use num::ToPrimitive;
 use std::cell::RefCell;
-use std::io::BufRead;
 
 pub struct Context<'a> {
     pub strings: &'a Rodeo,
@@ -33,6 +32,7 @@ pub fn define_builtins(env: Env, vm_env: vm::Env, strings: &mut Rodeo) -> (Env, 
 
     let eof = eof_.clone();
     bb.bind("__read_line", move |_, _| {
+        use std::io::BufRead;
         let mut s = String::new();
         match std::io::stdin().lock().read_line(&mut s) {
             Ok(0) => eof.clone(),
@@ -52,13 +52,13 @@ pub fn define_builtins(env: Env, vm_env: vm::Env, strings: &mut Rodeo) -> (Env, 
     });
 
     bb.bind_opt("__chars", |s, _| {
-        let chars = RefCell::new(s.as_str().chars().rev().collect::<Vec<_>>());
-        chars.borrow_mut().pop().map(|ch| Value::string(ch.to_string()))
+        let mut chars = s.as_str().chars().rev().collect::<Vec<_>>();
+        chars.pop().map(|ch| Value::string(ch.to_string()))
     });
 
     bb.bind_opt("__split", |s, _| {
-        let parts = RefCell::new(s.as_str().split_whitespace().rev().map(str::to_string).collect::<Vec<_>>());
-        parts.borrow_mut().pop().map(Value::string)
+        let mut parts = s.as_str().split_whitespace().rev().map(str::to_string).collect::<Vec<_>>();
+        parts.pop().map(Value::string)
     });
 
     bb.bind("__escape", move |s, _| {

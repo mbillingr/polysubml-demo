@@ -1,19 +1,65 @@
+use crate::free_vars::free_vars;
 use crate::value::Value;
 use compiler_lib::ast::StringId;
 use compiler_lib::{Rodeo, ast};
+use std::collections::{BTreeSet, HashSet};
 use std::sync::Arc;
 
 pub struct CompilationContext<'a> {
-    pub strings: &'a mut Rodeo,
+    strings: &'a mut Rodeo,
+    tags: BTreeSet<String>,
+    fields: BTreeSet<String>,
+    sym_counter: usize,
 }
 
 impl<'a> CompilationContext<'a> {
+    pub fn new(strings: &'a mut Rodeo) -> Self {
+        let mut tags = BTreeSet::new();
+        for t in ["Err", "Ok", "Some", "None", "Eof", "Continue", "Break"] {
+            tags.insert(t.to_string());
+        }
+
+        let mut fields = BTreeSet::new();
+        for f in ["_0", "_1", "_2"] {
+            fields.insert(f.to_string());
+        }
+
+        Self {
+            strings,
+            tags, fields,
+            sym_counter: 0,
+        }
+    }
+
+    fn gensym(&mut self, prefix: &str) -> String {
+        let sym = format!("_{}_{}", prefix, self.sym_counter);
+        self.sym_counter += 1;
+        sym
+    }
+
     pub fn compile_script(&mut self, stmts: Vec<ast::Statement>) -> String {
         let mut out = String::new();
+
+        out += "mod runtime; use runtime::*; \n";
+        out += "use num::ToPrimitive;\n";
+        out += "fn main() {\n";
+        out += include_str!("../../libs/builtins.rs");
+
         for stmt in stmts {
             out += &self.compile_statement(stmt);
             out += "\n";
         }
+        out += "}";
+
+        out = format!(
+            "#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]\nenum _Tag {{ {} }}\n",
+            self.tags.iter().map(|t| format!("{},", t)).collect::<Vec<_>>().join("")
+        ) + &out;
+
+        out = format!(
+            "#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]\nenum _Field {{ {} }}\n",
+            self.fields.iter().map(|t| format!("{},", t)).collect::<Vec<_>>().join("")
+        ) + &out;
         out
     }
 
@@ -31,17 +77,28 @@ impl<'a> CompilationContext<'a> {
             ast::Statement::LetRecDef(defs) => {
                 let mut out = String::new();
                 for (name, _) in &defs {
-                    out += &format!("let mut {} = Value::nothing();\n", self.strings.resolve(name));
+                    out += &format!("let {} = Value::cell(Value::nothing());\n", self.strings.resolve(name));
                 }
                 for (name, (expr, _)) in defs {
                     let val = self.compile_expression(expr);
-                    out += &format!("{} = {}", self.strings.resolve(&name), val);
+                    out += &format!("{}.update_cell({});\n", self.strings.resolve(&name), val);
                 }
                 out
             }
 
             ast::Statement::Println(exprs) => {
-                todo!()
+                let mut out = String::new();
+                out += "println!(\"";
+                out += &vec!["{}"; exprs.len()].join(" ");
+                out += "\", ";
+                out += &exprs
+                    .into_iter()
+                    .map(|(e, _)| self.compile_expression(e))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                out += ");\n";
+
+                out
             }
 
             ast::Statement::Import(_) => unimplemented!(),
@@ -60,9 +117,14 @@ impl<'a> CompilationContext<'a> {
             }
 
             ast::LetPattern::Record(((_, field_patterns), _)) => {
-                let mut out = format!("let _rec = {};\n", expr);
-                for (i, ((field, _), inner_pat)) in field_patterns.into_iter().enumerate().rev() {
-                    out += &self.compile_pattern_assignment(*inner_pat, format!("_rec.get_field({})", i));
+                let tmp = self.gensym("rec");
+                let mut out = format!("let {tmp} = {};\n", expr);
+                for ((field, _), inner_pat) in field_patterns.into_iter().rev() {
+                    self.fields.insert(self.strings.resolve(&field).to_string());
+                    out += &self.compile_pattern_assignment(
+                        *inner_pat,
+                        format!("{tmp}.get_field(_Field::{})", self.strings.resolve(&field)),
+                    );
                 }
                 out
             }
@@ -73,17 +135,34 @@ impl<'a> CompilationContext<'a> {
         use ast::Literal::*;
         match expr {
             ast::Expr::BinOp(binop) => {
-                /*let ops = self.compile_expression(binop.lhs.0);
-                let ops = extend(ops, self.compile_expression(binop.rhs.0));
-
-                match (binop.op, binop.op_type) {
-                    (op, (Some(Int), _)) => append(ops, Op::IntOp(op)),
-                    (op, (Some(Float), _)) => append(ops, Op::FloatOp(op)),
-                    (op, (Some(Bool), _)) => append(ops, Op::BoolOp(op)),
-                    (op, (Some(Str), _)) => append(ops, Op::StrOp(op)),
-                    (op, (None, _)) => append(ops, Op::AnyOp(op)),
-                }*/
-                todo!()
+                use ast::Literal::*;
+                use ast::Op::*;
+                let lhs = self.compile_expression(binop.lhs.0);
+                let rhs = self.compile_expression(binop.rhs.0);
+                match (binop.op_type.0, binop.op) {
+                    (None, Eq) => format!("Value::bool(({lhs}) == ({rhs}))"),
+                    (None, Neq) => format!("Value::bool(({lhs}) != ({rhs}))"),
+                    (Some(Int), Lt) => format!("Value::bool(({lhs}).as_int() < ({rhs}).as_int())"),
+                    (Some(Int), Lte) => format!("Value::bool(({lhs}).as_int() <= ({rhs}).as_int())"),
+                    (Some(Int), Gt) => format!("Value::bool(({lhs}).as_int() > ({rhs}).as_int())"),
+                    (Some(Int), Gte) => format!("Value::bool(({lhs}).as_int() >= ({rhs}).as_int())"),
+                    (Some(Int), Add) => format!("Value::int(({lhs}).as_int() + ({rhs}).as_int())"),
+                    (Some(Int), Sub) => format!("Value::int(({lhs}).as_int() - ({rhs}).as_int())"),
+                    (Some(Int), Mult) => format!("Value::int(({lhs}).as_int() * ({rhs}).as_int())"),
+                    (Some(Int), Div) => format!("Value::int(({lhs}).as_int() / ({rhs}).as_int())"),
+                    (Some(Int), Rem) => format!("Value::int(({lhs}).as_int() % ({rhs}).as_int())"),
+                    (Some(Float), Lt) => format!("Value::bool(({lhs}).as_float() < ({rhs}).as_float())"),
+                    (Some(Float), Lte) => format!("Value::bool(({lhs}).as_float() <= ({rhs}).as_float())"),
+                    (Some(Float), Gt) => format!("Value::bool(({lhs}).as_float() > ({rhs}).as_float())"),
+                    (Some(Float), Gte) => format!("Value::bool(({lhs}).as_float() >= ({rhs}).as_float())"),
+                    (Some(Float), Add) => format!("Value::float(({lhs}).as_float() + ({rhs}).as_float())"),
+                    (Some(Float), Sub) => format!("Value::float(({lhs}).as_float() - ({rhs}).as_float())"),
+                    (Some(Float), Mult) => format!("Value::float(({lhs}).as_float() * ({rhs}).as_float())"),
+                    (Some(Float), Div) => format!("Value::float(({lhs}).as_float() / ({rhs}).as_float())"),
+                    (Some(Float), Rem) => format!("Value::float(({lhs}).as_float() % ({rhs}).as_float())"),
+                    (Some(Str), Add) => format!("Value::string(({lhs}).as_str().to_string() + ({rhs}).as_str())"),
+                    other => todo!("{other:?}"),
+                }
             }
 
             ast::Expr::Block(block) => {
@@ -102,25 +181,28 @@ impl<'a> CompilationContext<'a> {
                 if call.eval_arg_first {
                     format!("{{let _arg = {{ {arg} }}; ({f})(_arg)}}")
                 } else {
-                    format!("({f})({arg})")
+                    format!("({f}).apply({arg})")
                 }
             }
 
             ast::Expr::Case(case) => {
+                self.tags.insert(self.strings.resolve(&case.tag.0).to_string());
                 let inner = self.compile_expression(case.expr.0);
-                format!("Value::case(Tag::{}, {})", self.strings.resolve(&case.tag.0), inner)
+                format!("Value::case(_Tag::{}, {})", self.strings.resolve(&case.tag.0), inner)
             }
 
             ast::Expr::FieldAccess(field_access) => {
+                self.fields.insert(self.strings.resolve(&field_access.field.0).to_string());
                 let obj = self.compile_expression(field_access.expr.0);
-                format!("({}).get_field({})", obj, self.strings.resolve(&field_access.field.0))
+                format!("({}).get_field(_Field::{})", obj, self.strings.resolve(&field_access.field.0))
             }
 
             ast::Expr::FieldSet(field_access) => {
+                self.fields.insert(self.strings.resolve(&field_access.field.0).to_string());
                 let obj = self.compile_expression(field_access.expr.0);
                 let val = self.compile_expression(field_access.value.0);
                 format!(
-                    "({}).set_field({}, {})",
+                    "({}).set_field(_Field::{}, {})",
                     obj,
                     self.strings.resolve(&field_access.field.0),
                     val
@@ -128,7 +210,22 @@ impl<'a> CompilationContext<'a> {
             }
 
             ast::Expr::FuncDef(fndef) => {
-                todo!()
+                let tmp = ast::Expr::FuncDef(fndef);
+                let cls_vars = free_vars(&tmp);
+                let fndef = if let ast::Expr::FuncDef(fndef) = tmp {
+                    fndef
+                } else {
+                    unreachable!()
+                };
+
+                let pat = self.compile_pattern_assignment(fndef.param.0, "arg".to_string());
+                let body = self.compile_expression(fndef.body.0);
+                let cls = cls_vars
+                    .into_iter()
+                    .map(|v| format!("let {x} = {x}.clone();", x = self.strings.resolve(&v)))
+                    .collect::<Vec<_>>()
+                    .join("; ");
+                format!("Value::func({{ {cls} move|arg| {{ {pat} {body} }} }})")
             }
 
             ast::Expr::If(if_) => {
@@ -147,17 +244,20 @@ impl<'a> CompilationContext<'a> {
                 value: (value, _),
             }) => match lit_type {
                 Bool => format!("Value::bool({})", value),
-                Int => format!("Value::int({})", value),
+                Int => format!("Value::int_literal({})", value),
                 Float => format!("Value::float({})", value),
                 Str => format!("Value::str({})", value),
             },
 
             ast::Expr::Loop(loop_) => {
-                todo!()
+                self.tags.insert("Break".to_string());
+                self.tags.insert("Loop".to_string());
+                let body = self.compile_expression(loop_.body.0);
+                format!("loop {{ if let (_Tag::Break, res) = ({body}).as_case() {{ break res.clone() }} }}")
             }
 
             ast::Expr::Match(mx) => {
-                /*let ops = self.compile_expression(mx.expr.0.0);
+                let val = self.compile_expression(mx.expr.0.0);
 
                 let mut wildcard_arm = None;
                 let mut tag_arms = vec![];
@@ -169,46 +269,52 @@ impl<'a> CompilationContext<'a> {
                     }
                 }
 
-                let mut last_branch = vec![];
+                let tmp = self.gensym("val");
 
-                if let Some((var, expr)) = wildcard_arm {
-                    last_branch = extend(self.compile_pattern_assignment(var), self.compile_expression(expr));
-                }
+                let mut out = String::new();
+                out += "{\n";
+                out += &format!("let {tmp} = {val};\n");
+                out += &format!("match {tmp}.as_case() {{\n");
 
                 for (tag, pat, expr) in tag_arms {
-                    let out = last_branch.len() as isize;
-                    let branch = vec![Op::UnwrapCase];
-                    let branch = extend(branch, self.compile_pattern_assignment(pat));
-                    let branch = extend(branch, self.compile_expression(expr));
-                    let branch = append(branch, Op::Jump(out));
-                    let skip = branch.len() as isize;
-                    let branch = extend(vec![Op::PeekAndJumpNotTag(tag, skip)], branch);
-                    last_branch = extend(branch, last_branch);
+                    let pat = self.compile_pattern_assignment(pat, tmp.clone());
+                    let body = self.compile_expression(expr);
+                    let tag = self.strings.resolve(&tag);
+                    self.tags.insert(tag.to_string());
+                    out += &format!("(_Tag::{tag}, {tmp}) => {{ {pat} {body} }}\n");
                 }
-                let ops = append(ops, Op::PushEnv);
-                let ops = append(ops, Op::Swap);
-                let ops = extend(ops, last_branch);
-                let ops = append(ops, Op::Swap);
-                let ops = append(ops, Op::PopEnv);
-                ops*/
-                todo!()
+
+                if let Some((pat, expr)) = wildcard_arm {
+                    out += &format!(
+                        "_ => {{ {} {} }}",
+                        self.compile_pattern_assignment(pat, tmp),
+                        self.compile_expression(expr)
+                    );
+                } else {
+                    out += "_ => unreachable!()";
+                }
+
+                out += "}}";
+                out
             }
 
             ast::Expr::Record(rec) => {
-                /*let mut ops = vec![];
-                let mut fields = Vec::with_capacity(rec.fields.len());
-                for ((fld, _), val, _, _) in rec.fields {
-                    fields.push(fld);
-                    ops = extend(ops, self.compile_expression(val.0));
+                let mut out = "Value::record([".to_string();
+
+                for ((fld, _), val, mutable, _) in rec.fields {
+                    let val = self.compile_expression(val.0);
+                    let fld = self.strings.resolve(&fld);
+                    self.fields.insert(fld.to_string());
+                    out += &format!("(_Field::{fld}, {val}, {mutable}),");
                 }
-                ops.push(Op::MakeRecord(fields));
-                ops*/
-                todo!()
+
+                out += "])";
+                out
             }
 
             ast::Expr::Typed(tx) => self.compile_expression(tx.expr.0),
 
-            ast::Expr::Variable(var) => format!("{}", self.strings.resolve(&var.name)),
+            ast::Expr::Variable(var) => format!("{}.clone()", self.strings.resolve(&var.name)),
 
             ast::Expr::Array(_, _) => todo!(),
             ast::Expr::Dict(_, _) => todo!(),

@@ -67,7 +67,7 @@ impl<'a> Context<'a> {
                 let rhs = self.eval(&bop.rhs.0);
                 match (&bop.op_type.0, &bop.op) {
                     (None, Eq) => Value::bool(lhs == rhs),
-                    (None, Neq) => Value::bool(lhs == rhs),
+                    (None, Neq) => Value::bool(lhs != rhs),
                     (Some(Int), Lt) => Value::bool(lhs.as_int() < rhs.as_int()),
                     (Some(Int), Lte) => Value::bool(lhs.as_int() <= rhs.as_int()),
                     (Some(Int), Gt) => Value::bool(lhs.as_int() > rhs.as_int()),
@@ -89,21 +89,6 @@ impl<'a> Context<'a> {
                     (Some(Str), Add) => Value::string(lhs.as_str().to_string() + rhs.as_str()),
                     other => todo!("{other:?}"),
                 }
-                /*match bop.op {
-                    ast::Op::Add => lhs + rhs,
-                    ast::Op::Sub => lhs - rhs,
-                    ast::Op::Mult => lhs * rhs,
-                    ast::Op::Div => lhs / rhs,
-                    ast::Op::Rem => lhs % rhs,
-
-                    ast::Op::Lt => Value::bool(lhs < rhs),
-                    ast::Op::Lte => Value::bool(lhs <= rhs),
-                    ast::Op::Gt => Value::bool(lhs > rhs),
-                    ast::Op::Gte => Value::bool(lhs >= rhs),
-
-                    ast::Op::Eq => Value::bool(lhs == rhs),
-                    ast::Op::Neq => Value::bool(lhs != rhs),
-                }*/
             }
 
             ast::Expr::Block(block) => {

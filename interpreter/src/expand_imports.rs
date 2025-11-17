@@ -49,9 +49,19 @@ impl<'a> ImportExpansion<'a> {
                     let path = path.canonicalize().map_err(|_| {
                         SpannedError::new1(format!("Could not resolve import path {}", path.display()), path_span)
                     })?;
+                    /*
                     // construct a name from the path and a leading space to create an
                     // identifier that cannot be shadowed by any other variable name.
                     let module_private_name = self.strings.get_or_intern(&format!(" {}", path.display()));
+                    */
+
+                    // use a valid rust identifier
+                    let module_private_name = self.strings.get_or_intern(
+                        &format!("{}", path.display())
+                            .replace("/", "_")
+                            .replace("-", "_")
+                            .replace(".", "_"),
+                    );
 
                     match self.known_modules.get(&module_private_name) {
                         Some(None) => return Err(SpannedError::new1("cyclic import", path_span)),

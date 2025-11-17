@@ -1,0 +1,12 @@
+[package]
+name = "compilation-target"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+escape-bytes = "0.1.1"
+im-rc = "15.1"
+num-bigint = "0.4"
+num = "0.4"
+
+[workspace]
