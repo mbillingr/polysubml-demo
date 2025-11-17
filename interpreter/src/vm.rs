@@ -76,6 +76,11 @@ fn run(ops: &[Op], stack: &mut Vec<Value>, env: &mut Env, strings: &Rodeo) {
                 stack.push(rec);
             }
 
+            Op::MakeVector(n) => {
+                let values = stack.split_off(stack.len() - *n);
+                stack.push(Value::vect(values))
+            }
+
             Op::GetField(field) => {
                 let rec = stack.pop().unwrap();
                 let val = rec.get_field(*field);

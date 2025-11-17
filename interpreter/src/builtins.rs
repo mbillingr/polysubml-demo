@@ -115,7 +115,7 @@ pub fn define_builtins(env: Env, vm_env: vm::Env, strings: &mut Rodeo) -> (Env, 
         let x = x.map(|x| *x = val);
         x.map(|_| Value::vect(v))
     });
-    bb.bind("__vec_split", move |args, ctx| {
+    bb.bind("__vec_split", move |args, _| {
         let mut v = args.get_field(idx0).as_vect().clone();
         let idx = args.get_field(idx1).as_int().to_usize().unwrap();
         let w = v.split_off(idx);

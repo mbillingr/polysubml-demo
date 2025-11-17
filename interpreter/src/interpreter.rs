@@ -204,6 +204,8 @@ impl<'a> Context<'a> {
             ast::Expr::Typed(tx) => self.eval(&tx.expr.0),
 
             ast::Expr::Variable(var) => self.state.env.lookup(var.name).unwrap(),
+
+            ast::Expr::Array(_, items) => Value::vect(items.iter().map(|item| self.eval(&item.0)).collect::<Vec<_>>()),
         }
     }
 }

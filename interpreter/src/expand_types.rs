@@ -129,6 +129,7 @@ impl Expandable for ast::Expr {
             ast::Expr::Record(x) => x.expand(ctx).map(ast::Expr::Record),
             ast::Expr::Typed(x) => x.expand(ctx).map(ast::Expr::Typed),
             ast::Expr::Variable(x) => x.expand(ctx).map(ast::Expr::Variable),
+            ast::Expr::Array(kind, xs) => xs.expand(ctx).map(|xs| ast::Expr::Array(kind, xs)),
         }
     }
 }

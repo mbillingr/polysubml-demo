@@ -230,8 +230,7 @@ impl Value {
             Value::Env(_) => "<env>".to_string(),
 
             Value::Vect(v) => {
-                let mut s = String::new();
-                s.push('[');
+                let mut s = "#[".to_string();
                 for (i, v) in v.iter().enumerate() {
                     if i > 0 {
                         s.push_str(", ");

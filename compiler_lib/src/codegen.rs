@@ -281,6 +281,7 @@ fn compile(ctx: &mut Context<'_>, expr: &ast::SExpr) -> js::Expr {
         ),
         ast::Expr::Typed(e) => compile(ctx, &e.expr),
         ast::Expr::Variable(e) => ctx.bindings.get(&e.name).unwrap().clone(),
+        ast::Expr::Array(_, _) => unimplemented!(),
     }
 }
 

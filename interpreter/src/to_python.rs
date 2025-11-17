@@ -253,6 +253,8 @@ impl<'a> CompilationContext<'a> {
             ast::Expr::Typed(tx) => self.compile_expression(tx.expr.0),
 
             ast::Expr::Variable(var) => PyExpr::var(var.name),
+
+            ast::Expr::Array(_, _) => todo!(),
         }
     }
 

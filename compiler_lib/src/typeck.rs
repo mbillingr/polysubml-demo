@@ -285,7 +285,15 @@ impl TypeckState {
             }
 
             // Cases that should be inferred instead
-            BinOp(_) | Case(_) | FuncDef(_) | Literal(_) | InstantiateExist(_) | Record(_) | Typed(_) | Variable(_) => {
+            BinOp(_)
+            | Case(_)
+            | FuncDef(_)
+            | Literal(_)
+            | InstantiateExist(_)
+            | Record(_)
+            | Typed(_)
+            | Variable(_)
+            | Array(_, _) => {
                 // Span is just an arbitrary span (usually that of the current expression) used
                 // to help users diagnose cause of a type error that doesn't go through any holes.
                 let t = self.infer_expr(strings, expr)?;
@@ -465,6 +473,12 @@ impl TypeckState {
                 } else {
                     Err(SyntaxError::new1(format!("SyntaxError: Undefined variable"), expr.1))
                 }
+            }
+
+            Array(kind, items) => {
+                let v_items = items.iter().map(|x| self.infer_expr(strings, x)).collect::<Result<_>>()?;
+                let item_v = self.core.new_val(VUnion(v_items), expr.1, None);
+                Ok(self.core.new_val(VTypeHead::VContainer(*kind, item_v), expr.1, None))
             }
 
             // Cases that have to be checked instead

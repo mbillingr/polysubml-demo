@@ -227,6 +227,16 @@ impl<'a> CompilationContext<'a> {
             ast::Expr::Typed(tx) => self.compile_expression(tx.expr.0),
 
             ast::Expr::Variable(var) => vec![Op::PushVar(var.name)],
+
+            ast::Expr::Array(_, items) => {
+                let n = items.len();
+                let mut ops = vec![];
+                for item in items {
+                    ops = extend(ops, self.compile_expression(item.0));
+                }
+                ops.push(Op::MakeVector(n));
+                ops
+            }
         }
     }
 }
@@ -274,6 +284,9 @@ pub enum Op {
 
     /// Pop a value for each field from the stack and push a record
     MakeRecord(Vec<(StringId, bool)>),
+
+    /// Pop n values from the stack and push a vector
+    MakeVector(usize),
 
     /// Pop a record from the stack and push the field's value
     GetField(StringId),

@@ -138,6 +138,7 @@ pub enum Expr {
     Record(RecordExpr),
     Typed(TypedExpr),
     Variable(VariableExpr),
+    Array(StringId, Vec<SExpr>),
 }
 pub type SExpr = Spanned<Expr>;
 
@@ -237,4 +238,8 @@ pub fn typed(expr: Box<SExpr>, type_expr: STypeExpr) -> Expr {
 
 pub fn variable(name: StringId) -> Expr {
     Expr::Variable(VariableExpr { name })
+}
+
+pub fn array(kind: StringId, items: Vec<SExpr>) -> Expr {
+    Expr::Array(kind, items)
 }
