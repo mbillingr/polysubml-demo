@@ -123,6 +123,23 @@ impl TypeckState {
         );
         self.declare_builtin("__vec_split", "type a. (vec@a) * int -> (vec@a) * (vec@a)", smgr, strings);
 
+        self.declare_builtin("__dict_new", "any -> dict@never*never", smgr, strings);
+        self.declare_builtin("__dict_length", "(dict@any*any) -> int", smgr, strings);
+        self.declare_builtin(
+            "__dict_insert",
+            "type k v r s. ((dict@k*v) * r * s) -> dict@(k|r)*(v|s)",
+            smgr,
+            strings,
+        );
+        self.declare_builtin("__dict_contains", "type k v. ((dict@k*v) * k) -> bool", smgr, strings);
+        self.declare_builtin("__dict_remove", "type k v. ((dict@k*v) * k) -> dict@k*v", smgr, strings);
+        self.declare_builtin(
+            "__dict_get",
+            "type k v. ((dict@k*v) * k) -> [`Some v | `None any]",
+            smgr,
+            strings,
+        );
+
         self.bindings.make_permanent(n);
     }
 
@@ -293,7 +310,8 @@ impl TypeckState {
             | Record(_)
             | Typed(_)
             | Variable(_)
-            | Array(_, _) => {
+            | Array(_, _)
+            | Dict(_, _) => {
                 // Span is just an arbitrary span (usually that of the current expression) used
                 // to help users diagnose cause of a type error that doesn't go through any holes.
                 let t = self.infer_expr(strings, expr)?;
@@ -478,7 +496,21 @@ impl TypeckState {
             Array(kind, items) => {
                 let v_items = items.iter().map(|x| self.infer_expr(strings, x)).collect::<Result<_>>()?;
                 let item_v = self.core.new_val(VUnion(v_items), expr.1, None);
-                Ok(self.core.new_val(VTypeHead::VContainer(*kind, item_v), expr.1, None))
+                Ok(self.core.new_val(VContainer(*kind, vec![item_v]), expr.1, None))
+            }
+
+            Dict(kind, items) => {
+                let v_keys = items
+                    .iter()
+                    .map(|(k, _)| self.infer_expr(strings, k))
+                    .collect::<Result<_>>()?;
+                let v_vals = items
+                    .iter()
+                    .map(|(_, v)| self.infer_expr(strings, v))
+                    .collect::<Result<_>>()?;
+                let key_v = self.core.new_val(VUnion(v_keys), expr.1, None);
+                let val_v = self.core.new_val(VUnion(v_vals), expr.1, None);
+                Ok(self.core.new_val(VContainer(*kind, vec![key_v, val_v]), expr.1, None))
             }
 
             // Cases that have to be checked instead

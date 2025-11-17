@@ -122,6 +122,32 @@ pub fn define_builtins(env: Env, vm_env: vm::Env, strings: &mut Rodeo) -> (Env, 
         Value::record(vec![(idx0, Value::vect(v), false), (idx1, Value::vect(w), false)])
     });
 
+    bb.bind("__dict_new", |_, _| Value::dict(vec![]));
+    bb.bind("__dict_length", |dict, _| Value::usize(dict.as_dict().len().into()));
+    bb.bind("__dict_insert", move |args, _| {
+        let mut d = args.get_field(idx0).as_dict().clone();
+        let k = args.get_field(idx1);
+        let v = args.get_field(idx2);
+        d.insert(k, v);
+        Value::dict(d)
+    });
+    bb.bind("__dict_contains", move |args, _| {
+        let d = args.get_field(idx0).as_dict().clone();
+        let k = args.get_field(idx1);
+        Value::bool(d.contains_key(&k))
+    });
+    bb.bind("__dict_remove", move |args, _| {
+        let mut d = args.get_field(idx0).as_dict().clone();
+        let k = args.get_field(idx1);
+        d.remove(&k);
+        Value::dict(d)
+    });
+    bb.bind_opt("__dict_get", move |args, _| {
+        let d = args.get_field(idx0).as_dict().clone();
+        let k = args.get_field(idx1);
+        d.get(&k).cloned()
+    });
+
     (bb.env, bb.vm_env)
 }
 

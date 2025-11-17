@@ -42,7 +42,7 @@ enum ParsedTypeHead {
     Top,
     Hole(HoleSrc),
     Simple(TypeCtorInd),
-    Container(StringId, RcParsedType),
+    Container(StringId, Vec<RcParsedType>),
 }
 type ParsedType = (PolyAndRecDeps, Span, ParsedTypeHead);
 type RcParsedType = Rc<ParsedType>;
@@ -196,9 +196,15 @@ impl<'a> TreeMaterializer<'a> {
                 return;
             }
 
-            &Container(tc, ref t) => {
-                let (v1, u1) = self.materialize_tree(t);
-                (VContainer(tc, v1), UContainer(tc, u1))
+            &Container(tc, ref ts) => {
+                let mut vs = Vec::with_capacity(ts.len());
+                let mut us = Vec::with_capacity(ts.len());
+                for t in ts {
+                    let (v, u) = self.materialize_tree(t);
+                    vs.push(v);
+                    us.push(u);
+                }
+                (VContainer(tc, vs), UContainer(tc, us))
             }
 
             &VarJoin(kind, ref vars, ref sub) => {
@@ -529,9 +535,12 @@ impl<'a> TypeParser<'a> {
                     return Err(SyntaxError::new1("SyntaxError: Undefined type or type constructor", span));
                 }
             }
-            Container(tc, t) => {
-                let t = deps.add(self.parse_type_sub(t)?);
-                ParsedTypeHead::Container(*tc, t)
+            Container(tc, ts) => {
+                let mut ps = Vec::with_capacity(ts.len());
+                for t in ts {
+                    ps.push(deps.add(self.parse_type_sub(t)?));
+                }
+                ParsedTypeHead::Container(*tc, ps)
             }
             &Poly(ref params, ref def, kind) => {
                 let loc = SourceLoc(span);

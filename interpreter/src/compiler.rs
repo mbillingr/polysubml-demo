@@ -237,6 +237,17 @@ impl<'a> CompilationContext<'a> {
                 ops.push(Op::MakeVector(n));
                 ops
             }
+
+            ast::Expr::Dict(_, items) => {
+                let n = items.len();
+                let mut ops = vec![];
+                for ((key, _), (val, _)) in items {
+                    ops = extend(ops, self.compile_expression(key));
+                    ops = extend(ops, self.compile_expression(val));
+                }
+                ops.push(Op::MakeDict(n));
+                ops
+            }
         }
     }
 }
@@ -287,6 +298,9 @@ pub enum Op {
 
     /// Pop n values from the stack and push a vector
     MakeVector(usize),
+
+    /// Pop n*2 values from the stack and push a dict
+    MakeDict(usize),
 
     /// Pop a record from the stack and push the field's value
     GetField(StringId),

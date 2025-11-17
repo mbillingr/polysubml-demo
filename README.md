@@ -10,7 +10,8 @@ This is a fork of PolySubML that adds the following features:
     * Module system
     * Module-wide type definitions
 * A few features require extending the core typechecker
-    * Arrays/Vectors/Dictionaries (todo)
+    * Arrays/Vectors
+    * Dictionaries
 
 PolySubML is an experimental ML-like programming language with the following features:
 

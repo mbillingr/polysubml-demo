@@ -139,6 +139,7 @@ pub enum Expr {
     Typed(TypedExpr),
     Variable(VariableExpr),
     Array(StringId, Vec<SExpr>),
+    Dict(StringId, Vec<(SExpr, SExpr)>),
 }
 pub type SExpr = Spanned<Expr>;
 
@@ -242,4 +243,8 @@ pub fn variable(name: StringId) -> Expr {
 
 pub fn array(kind: StringId, items: Vec<SExpr>) -> Expr {
     Expr::Array(kind, items)
+}
+
+pub fn dict(kind: StringId, items: Vec<(SExpr, SExpr)>) -> Expr {
+    Expr::Dict(kind, items)
 }

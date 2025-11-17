@@ -101,7 +101,7 @@ pub enum VTypeHead {
         ty: TypeCtorInd,
     },
 
-    VContainer(StringId, Value),
+    VContainer(StringId, Vec<Value>),
 
     VPolyHead(Rc<PolyHeadData>, Value, bool),
     VTypeVar(VarSpec),
@@ -134,7 +134,7 @@ pub enum UTypeHead {
         ty: TypeCtorInd,
     },
 
-    UContainer(StringId, Use),
+    UContainer(StringId, Vec<Use>),
 
     UPolyHead(Rc<PolyHeadData>, Use, bool),
     UTypeVar(VarSpec),
@@ -354,11 +354,13 @@ fn check_heads(
             }
         }
 
-        (&VContainer(n1, r1), &UContainer(n2, r2)) => {
-            if n1 != n2 {
+        (&VContainer(n1, ref r1), &UContainer(n2, ref r2)) => {
+            if n1 != n2 || r1.len() != r2.len() {
                 return Err(type_mismatch_err(strings, type_ctors, lhs, rhs));
             }
-            out.push((r1, r2, edge_context));
+            for (v, u) in r1.iter().zip(r2) {
+                out.push((*v, *u, edge_context.clone()));
+            }
         }
 
         (&VTypeVar(tv1), &UTypeVar(tv2)) => {

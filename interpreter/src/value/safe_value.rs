@@ -3,10 +3,11 @@ use crate::interpreter::Env;
 use crate::{builtins, vm};
 use compiler_lib::ast::StringId;
 use compiler_lib::{Rodeo, ast};
-use im_rc::Vector;
+pub use im_rc::{HashMap as ImHashMap, Vector};
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 use std::fmt::Formatter;
+use std::hash::Hasher;
 use std::rc::Rc;
 
 pub type Int = num_bigint::BigInt;
@@ -28,6 +29,7 @@ pub enum Value {
     Env(vm::Env),
 
     Vect(Vector<Value>),
+    Dict(ImHashMap<Value, Value>),
 }
 
 #[derive(Clone, Debug)]
@@ -181,6 +183,17 @@ impl Value {
             _ => unimplemented!(),
         }
     }
+
+    pub fn dict(data: impl Into<ImHashMap<Value, Value>>) -> Value {
+        Value::Dict(data.into())
+    }
+
+    pub fn as_dict(&self) -> &ImHashMap<Value, Value> {
+        match self {
+            Value::Dict(d) => d,
+            _ => unimplemented!(),
+        }
+    }
 }
 
 impl Value {
@@ -240,6 +253,20 @@ impl Value {
                 s.push(']');
                 s
             }
+
+            Value::Dict(v) => {
+                let mut s = "#{".to_string();
+                for (i, (k, v)) in v.iter().enumerate() {
+                    if i > 0 {
+                        s.push_str(", ");
+                    }
+                    s.push_str(&k.show(r));
+                    s.push_str(": ");
+                    s.push_str(&v.show(r));
+                }
+                s.push('}');
+                s
+            }
         }
     }
 }
@@ -273,10 +300,33 @@ impl PartialEq for Value {
             (Int(a), Int(b)) => a.eq(b),
             (Float(a), Float(b)) => a.eq(b),
             (String(a), String(b)) => Rc::ptr_eq(a, b) || a.eq(b),
-            (Case(a), Case(b)) => Rc::ptr_eq(a, b),
+            (Case(a), Case(b)) => Rc::ptr_eq(a, b) || a.0.eq(&b.0) && a.1.eq(&b.1),
             (Record(a), Record(b)) => Rc::ptr_eq(a, b),
             (Callable(a), Callable(b)) => Rc::ptr_eq(a, b),
+            (Env(a), Env(b)) => a == b,
+            (Vect(a), Vect(b)) => a.ptr_eq(b),
+            (Dict(a), Dict(b)) => a.ptr_eq(b),
             _ => false,
+        }
+    }
+}
+
+impl Eq for Value {}
+
+impl std::hash::Hash for Value {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self {
+            Value::Nothing => ().hash(state),
+            Value::Bool(b) => b.hash(state),
+            Value::Int(i) => i.hash(state),
+            Value::Float(f) => f.to_bits().hash(state),
+            Value::String(s) => s.hash(state),
+            Value::Case(a) => a.0.hash(state),
+            Value::Record(a) => Rc::as_ptr(a).hash(state),
+            Value::Callable(a) => Rc::as_ptr(a).hash(state),
+            Value::Env(e) => e.hash(state),
+            Value::Vect(v) => v.hash(state),
+            Value::Dict(d) => d.hash(state),
         }
     }
 }

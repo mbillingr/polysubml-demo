@@ -211,6 +211,7 @@ impl<'a> CompilationContext<'a> {
             ast::Expr::Variable(var) => format!("{}", self.strings.resolve(&var.name)),
 
             ast::Expr::Array(_, _) => todo!(),
+            ast::Expr::Dict(_, _) => todo!(),
         }
     }
 }

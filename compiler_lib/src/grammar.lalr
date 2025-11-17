@@ -157,7 +157,7 @@ Type = {
     "rec" <Ident> "=" <Box<SType>> => ast::TypeExpr::RecursiveDef(<>),
     <Spanned<("<<" <Spanned<Ident>> <SType*> ">>")>> => ast::TypeExpr::TypeRef(<>),
 
-    <Ident> "@" <Box<Spanned<SimpleType>>> => ast::TypeExpr::Container(<>),
+    <Ident> "@" <SepList<Spanned<SimpleType>, "*">> => ast::TypeExpr::Container(<>),
 }
 pub SType = Spanned<Type>;
 
@@ -249,6 +249,7 @@ SimpleExpr = {
     VarOrLiteral,
     "(" <Expr> ")",
     "#[" <SepListOpt<SSimpleExpr, ",">> "]" => ast::expr::array(ctx.strings.get_or_intern_static("vec"), <>),
+    "#{" <SepListOpt<(<SSimpleExpr> ":" <SSimpleExpr>), ",">> "}" => ast::expr::dict(ctx.strings.get_or_intern_static("dict"), <>),
     "(" <Box<SExpr>> ":" <SType> ")" => ast::expr::typed(<>),
     "begin" <Expr> "end",
 }

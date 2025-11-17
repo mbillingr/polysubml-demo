@@ -130,6 +130,7 @@ impl Expandable for ast::Expr {
             ast::Expr::Typed(x) => x.expand(ctx).map(ast::Expr::Typed),
             ast::Expr::Variable(x) => x.expand(ctx).map(ast::Expr::Variable),
             ast::Expr::Array(kind, xs) => xs.expand(ctx).map(|xs| ast::Expr::Array(kind, xs)),
+            ast::Expr::Dict(kind, xs) => xs.expand(ctx).map(|xs| ast::Expr::Dict(kind, xs)),
         }
     }
 }

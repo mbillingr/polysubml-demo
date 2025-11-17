@@ -102,7 +102,7 @@ pub enum TypeExpr {
     VarJoin(JoinKind, Vec<STypeExpr>),
 
     TypeRef(((Spanned<StringId>, Vec<STypeExpr>), Span)),
-    Container(StringId, Box<STypeExpr>),
+    Container(StringId, Vec<STypeExpr>),
 }
 pub type STypeExpr = Spanned<TypeExpr>;
 

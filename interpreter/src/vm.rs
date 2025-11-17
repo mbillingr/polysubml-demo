@@ -1,5 +1,5 @@
 use crate::compiler::Op;
-use crate::value::{Func, Value};
+use crate::value::{Func, ImHashMap, Value};
 use compiler_lib::ast::StringId;
 use compiler_lib::{Rodeo, ast};
 use std::cell::RefCell;
@@ -79,6 +79,12 @@ fn run(ops: &[Op], stack: &mut Vec<Value>, env: &mut Env, strings: &Rodeo) {
             Op::MakeVector(n) => {
                 let values = stack.split_off(stack.len() - *n);
                 stack.push(Value::vect(values))
+            }
+
+            Op::MakeDict(n) => {
+                let values = stack.split_off(stack.len() - 2 * n);
+                let dict: ImHashMap<_, _> = values.chunks(2).map(|pair| (pair[0].clone(), pair[1].clone())).collect();
+                stack.push(Value::dict(dict))
             }
 
             Op::GetField(field) => {
@@ -220,7 +226,7 @@ fn run(ops: &[Op], stack: &mut Vec<Value>, env: &mut Env, strings: &Rodeo) {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq)]
 pub enum Env {
     Empty,
     Entry(Rc<(StringId, Value, Env)>),
@@ -290,6 +296,27 @@ impl Env {
                     cursor = c;
                 }
             }
+        }
+    }
+}
+
+impl PartialEq for Env {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Env::Empty, Env::Empty) => true,
+            (Env::Entry(a), Env::Entry(b)) => Rc::ptr_eq(a, b),
+            (Env::Lazy(a), Env::Lazy(b)) => Rc::ptr_eq(a, b),
+            _ => false,
+        }
+    }
+}
+
+impl std::hash::Hash for Env {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        match self {
+            Env::Empty => state.write_u8(0),
+            Env::Entry(e) => Rc::as_ptr(e).hash(state),
+            Env::Lazy(e) => Rc::as_ptr(e).hash(state),
         }
     }
 }

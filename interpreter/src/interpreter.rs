@@ -1,6 +1,6 @@
 use crate::builtins;
-use crate::value::Value;
 use crate::value::{Builtin, Func};
+use crate::value::{ImHashMap, Value};
 use compiler_lib::ast::StringId;
 use compiler_lib::{Rodeo, ast};
 use std::borrow::Cow;
@@ -206,6 +206,13 @@ impl<'a> Context<'a> {
             ast::Expr::Variable(var) => self.state.env.lookup(var.name).unwrap(),
 
             ast::Expr::Array(_, items) => Value::vect(items.iter().map(|item| self.eval(&item.0)).collect::<Vec<_>>()),
+
+            ast::Expr::Dict(_, items) => Value::dict(
+                items
+                    .iter()
+                    .map(|item| (self.eval(&item.0.0), self.eval(&item.1.0)))
+                    .collect::<ImHashMap<_, _>>(),
+            ),
         }
     }
 }
