@@ -4,7 +4,6 @@ use crate::vm;
 use compiler_lib::Rodeo;
 use compiler_lib::ast::StringId;
 use num::ToPrimitive;
-use std::cell::RefCell;
 
 pub struct Context<'a> {
     pub strings: &'a Rodeo,

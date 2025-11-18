@@ -4,51 +4,9 @@ use compiler_lib::spans::Spanned;
 use std::collections::HashSet;
 
 pub fn free_vars(expr: &ast::Expr) -> HashSet<StringId> {
-    let mut fvv = FreeVarsVisitor { fvs: HashSet::new() };
+    let mut fvv = FreeVarsVisitor::new();
     expr.walk_ast(&mut fvv);
     fvv.fvs
-}
-
-pub trait FindFreeVars {
-    fn find_free_vars(&self, fvs: &mut HashSet<StringId>);
-}
-
-impl FindFreeVars for ast::Expr {
-    fn find_free_vars(&self, fvs: &mut HashSet<StringId>) {
-        match self {
-            ast::Expr::BinOp(boe) => {
-                boe.lhs.find_free_vars(fvs);
-                boe.rhs.find_free_vars(fvs);
-            }
-
-            ast::Expr::Block(blk) => {
-                blk.statements.find_free_vars(fvs);
-                blk.expr.find_free_vars(fvs);
-            }
-
-            _ => todo!(),
-        }
-    }
-}
-
-impl FindFreeVars for ast::Statement {
-    fn find_free_vars(&self, fvs: &mut HashSet<StringId>) {
-        todo!()
-    }
-}
-
-impl<T: FindFreeVars> FindFreeVars for Spanned<T> {
-    fn find_free_vars(&self, fvs: &mut HashSet<StringId>) {
-        self.0.find_free_vars(fvs)
-    }
-}
-
-impl<T: FindFreeVars> FindFreeVars for Vec<T> {
-    fn find_free_vars(&self, fvs: &mut HashSet<StringId>) {
-        for x in self {
-            x.find_free_vars(fvs);
-        }
-    }
 }
 
 pub struct FreeVarsVisitor {
@@ -95,7 +53,7 @@ impl AstVisitor for FreeVarsVisitor {
 
     fn post_visit_stmt(&mut self, stmt: &ast::Statement) {
         match stmt {
-            ast::Statement::LetDef((pat, _)) => {
+            ast::Statement::LetDef((_pat, _)) => {
                 unimplemented!()
             }
             ast::Statement::LetRecDef(defs) => {
@@ -121,9 +79,9 @@ impl AstVisitor for FreeVarsVisitor {
         }
     }
 
-    fn post_visit_pattern(&mut self, pattern: &ast::LetPattern) {}
+    fn post_visit_pattern(&mut self, _pattern: &ast::LetPattern) {}
 
-    fn post_visit_type(&mut self, expr: &ast::TypeExpr) {}
+    fn post_visit_type(&mut self, _expr: &ast::TypeExpr) {}
 }
 
 pub struct BoundVarsVisitor<'a> {
@@ -131,11 +89,11 @@ pub struct BoundVarsVisitor<'a> {
 }
 
 impl<'a> AstVisitor for BoundVarsVisitor<'a> {
-    fn post_visit_stmt(&mut self, stmt: &ast::Statement) {
+    fn post_visit_stmt(&mut self, _stmt: &ast::Statement) {
         unimplemented!()
     }
 
-    fn post_visit_expr(&mut self, expr: &ast::Expr) {
+    fn post_visit_expr(&mut self, _expr: &ast::Expr) {
         unimplemented!()
     }
 
@@ -148,27 +106,27 @@ impl<'a> AstVisitor for BoundVarsVisitor<'a> {
         }
     }
 
-    fn post_visit_type(&mut self, expr: &ast::TypeExpr) {}
+    fn post_visit_type(&mut self, _expr: &ast::TypeExpr) {}
 }
 
 pub trait AstVisitor {
-    fn pre_visit_stmt(&mut self, stmt: &ast::Statement) -> VisitResult {
+    fn pre_visit_stmt(&mut self, _: &ast::Statement) -> VisitResult {
         VisitResult::Continue
     }
-    fn pre_visit_expr(&mut self, expr: &ast::Expr) -> VisitResult {
+    fn pre_visit_expr(&mut self, _: &ast::Expr) -> VisitResult {
         VisitResult::Continue
     }
-    fn pre_visit_pattern(&mut self, pattern: &ast::LetPattern) -> VisitResult {
+    fn pre_visit_pattern(&mut self, _: &ast::LetPattern) -> VisitResult {
         VisitResult::Continue
     }
-    fn pre_visit_type(&mut self, expr: &ast::TypeExpr) -> VisitResult {
+    fn pre_visit_type(&mut self, _: &ast::TypeExpr) -> VisitResult {
         VisitResult::Continue
     }
 
-    fn post_visit_stmt(&mut self, stmt: &ast::Statement) {}
-    fn post_visit_expr(&mut self, expr: &ast::Expr) {}
-    fn post_visit_pattern(&mut self, pattern: &ast::LetPattern) {}
-    fn post_visit_type(&mut self, expr: &ast::TypeExpr) {}
+    fn post_visit_stmt(&mut self, _: &ast::Statement) {}
+    fn post_visit_expr(&mut self, _: &ast::Expr) {}
+    fn post_visit_pattern(&mut self, _: &ast::LetPattern) {}
+    fn post_visit_type(&mut self, _: &ast::TypeExpr) {}
 }
 
 pub enum VisitResult {
@@ -349,7 +307,7 @@ impl AstWalker for ast::expr::KeyPair {
 }
 
 impl AstWalker for StringId {
-    fn walk_ast(&self, visitor: &mut impl AstVisitor) {
+    fn walk_ast(&self, _: &mut impl AstVisitor) {
         // this trivial impl allows us to walk tuples that contain stringids and ast nodes
     }
 }

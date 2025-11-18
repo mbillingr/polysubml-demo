@@ -1,7 +1,7 @@
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-enum _Field { _0,_1,_2,and_then,f2i,f2s,i2f,i2s,lines,map,map_err,read_expected_line,read_line,s2f,s2i,unwrap,write_str, }
+enum _Field { _0,_1,_2,i, }
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-enum _Tag { Break,Continue,Eof,Err,Left,None,Ok,Right,Some, }
+enum _Tag { Break,Continue,Eof,Err,Loop,None,Ok,Some, }
 mod runtime; use runtime::*; 
 use num::ToPrimitive;
 fn main() {
@@ -143,103 +143,13 @@ let (panic, __read_line, __write_str, __chars, __split, __escape, __unescape, __
     });
 
     (__panic, __read_line, __write_str, __chars, __split, __escape, __unescape, __int_to_float, __float_to_int, __str_to_int, __str_to_float, __int_to_str, __float_to_str, __vec_new, __vec_length, __vec_push_back, __vec_pop_back, __vec_peek_back, __vec_push_front, __vec_pop_front, __vec_peek_front, __vec_get, __vec_set, __vec_split, __dict_new, __dict_length, __dict_insert, __dict_contains, __dict_remove, __dict_get)
-};let _home_martin_jj_working_polysubml_demo_libs_io_ml = Value::record([(_Field::lines, Value::func({ let panic = panic.clone();; let __read_line = __read_line.clone(); move|arg| { let x = arg;
- {
-let _val_0 = (__read_line.clone()).apply(x.clone());
-match _val_0.as_case() {
-(_Tag::Err, _val_0) => { let e = _val_0;
- (panic.clone()).apply(e.clone()) }
-(_Tag::Eof, _val_0) => { let _ = _val_0;
- Value::case(_Tag::None, Value::record([])) }
-(_Tag::Ok, _val_0) => { let l = _val_0;
- Value::case(_Tag::Some, l.clone()) }
-_ => unreachable!()}} } }), false),(_Field::read_line, __read_line.clone(), false),(_Field::write_str, __write_str.clone(), false),(_Field::read_expected_line, Value::func({ let panic = panic.clone();; let __read_line = __read_line.clone(); move|arg| { let x = arg;
- {
-let _val_1 = (__read_line.clone()).apply(x.clone());
-match _val_1.as_case() {
-(_Tag::Ok, _val_1) => { let l = _val_1;
- l.clone() }
-_ => { let _ = _val_1;
- (panic.clone()).apply(Value::str("could not read line")) }}} } }), false),]);
+};let vars = Value::record([(_Field::i, Value::int_literal(0), true),]);
 
-let _home_martin_jj_working_polysubml_demo_libs_num_ml = Value::record([(_Field::i2f, __int_to_float.clone(), false),(_Field::f2i, __float_to_int.clone(), false),(_Field::s2i, __str_to_int.clone(), false),(_Field::s2f, __str_to_float.clone(), false),(_Field::i2s, __int_to_str.clone(), false),(_Field::f2s, __float_to_str.clone(), false),]);
+let _ = loop { if let (_Tag::Break, res) = (if (Value::bool(((vars.clone()).get_field(_Field::i)).as_int() >= (Value::int_literal(50)).as_int())).as_bool() { Value::case(_Tag::Break, Value::int_literal(0)) } else { {
+let i = (vars.clone()).set_field(_Field::i, Value::int(((vars.clone()).get_field(_Field::i)).as_int() + (Value::int_literal(1)).as_int()));
+println!("{}", if (Value::bool((Value::int((i.clone()).as_int() % (Value::int_literal(3)).as_int())) == (Value::int_literal(0)))).as_bool() { if (Value::bool((Value::int((i.clone()).as_int() % (Value::int_literal(5)).as_int())) == (Value::int_literal(0)))).as_bool() { Value::str("FizzBuzz") } else { Value::str("Fizz") } } else { if (Value::bool((Value::int((i.clone()).as_int() % (Value::int_literal(5)).as_int())) == (Value::int_literal(0)))).as_bool() { Value::str("Buzz") } else { i.clone() } });
+Value::case(_Tag::Continue, Value::int_literal(0))
+} }).as_case() { break res.clone() } };
 
-let _home_martin_jj_working_polysubml_demo_libs_option_ml = {
-let map = Value::cell(Value::nothing());
-let map_err = Value::cell(Value::nothing());
-let and_then = Value::cell(Value::nothing());
-let unwrap = Value::cell(Value::nothing());
-map.update_cell(Value::func({  move|arg| { let _rec_2 = arg;
-let val = _rec_2.get_field(_Field::_1);
-let f = _rec_2.get_field(_Field::_0);
- {
-let _val_3 = val.clone();
-match _val_3.as_case() {
-(_Tag::Some, _val_3) => { let x = _val_3;
- Value::case(_Tag::Some, (f.clone()).apply(x.clone())) }
-(_Tag::Ok, _val_3) => { let x = _val_3;
- Value::case(_Tag::Ok, (f.clone()).apply(x.clone())) }
-(_Tag::Right, _val_3) => { let x = _val_3;
- Value::case(_Tag::Right, (f.clone()).apply(x.clone())) }
-_ => { let other = _val_3;
- other.clone() }}} } }));
-map_err.update_cell(Value::func({  move|arg| { let _rec_4 = arg;
-let val = _rec_4.get_field(_Field::_1);
-let f = _rec_4.get_field(_Field::_0);
- {
-let _val_5 = val.clone();
-match _val_5.as_case() {
-(_Tag::None, _val_5) => { let x = _val_5;
- Value::case(_Tag::None, (f.clone()).apply(x.clone())) }
-(_Tag::Err, _val_5) => { let x = _val_5;
- Value::case(_Tag::Err, (f.clone()).apply(x.clone())) }
-(_Tag::Left, _val_5) => { let x = _val_5;
- Value::case(_Tag::Left, (f.clone()).apply(x.clone())) }
-_ => { let other = _val_5;
- other.clone() }}} } }));
-and_then.update_cell(Value::func({  move|arg| { let _rec_6 = arg;
-let val = _rec_6.get_field(_Field::_1);
-let f = _rec_6.get_field(_Field::_0);
- {
-let _val_7 = val.clone();
-match _val_7.as_case() {
-(_Tag::Some, _val_7) => { let x = _val_7;
- (f.clone()).apply(x.clone()) }
-(_Tag::Ok, _val_7) => { let x = _val_7;
- (f.clone()).apply(x.clone()) }
-(_Tag::Right, _val_7) => { let x = _val_7;
- (f.clone()).apply(x.clone()) }
-_ => { let other = _val_7;
- other.clone() }}} } }));
-unwrap.update_cell(Value::func({ let panic = panic.clone(); move|arg| { let val = arg;
- {
-let _val_8 = val.clone();
-match _val_8.as_case() {
-(_Tag::Some, _val_8) => { let x = _val_8;
- x.clone() }
-(_Tag::Ok, _val_8) => { let x = _val_8;
- x.clone() }
-(_Tag::Right, _val_8) => { let x = _val_8;
- x.clone() }
-_ => { let _ = _val_8;
- (panic.clone()).apply(Value::str("unwrapped a fault value")) }}} } }));
-Value::record([(_Field::map, map.clone(), false),(_Field::map_err, map_err.clone(), false),(_Field::unwrap, unwrap.clone(), false),(_Field::and_then, and_then.clone(), false),])
-};
-
-let io = _home_martin_jj_working_polysubml_demo_libs_io_ml.clone();
-
-let num = _home_martin_jj_working_polysubml_demo_libs_num_ml.clone();
-
-let option = _home_martin_jj_working_polysubml_demo_libs_option_ml.clone();
-
-let fibonacci = Value::cell(Value::nothing());
-fibonacci.update_cell(Value::func({ let fibonacci = fibonacci.clone(); move|arg| { let n = arg;
- if (Value::bool((n.clone()).as_int() < (Value::int_literal(2)).as_int())).as_bool() { Value::int_literal(1) } else { Value::int(((fibonacci.clone()).apply(Value::int((n.clone()).as_int() - (Value::int_literal(1)).as_int()))).as_int() + ((fibonacci.clone()).apply(Value::int((n.clone()).as_int() - (Value::int_literal(2)).as_int()))).as_int()) } } }));
-
-let n = ((option.clone()).get_field(_Field::unwrap)).apply(((num.clone()).get_field(_Field::s2i)).apply(((io.clone()).get_field(_Field::read_expected_line)).apply(Value::record([]))));
-
-let f = (fibonacci.clone()).apply(n.clone());
-
-println!("{}", f.clone());
 
 }

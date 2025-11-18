@@ -8,7 +8,6 @@ mod interpreter;
 mod optimize;
 mod to_python;
 mod to_rust;
-mod to_rust2;
 mod value;
 mod vm;
 
@@ -84,24 +83,22 @@ fn exec(
     let t4 = std::time::Instant::now();
     let ops = optimize::optimize(ops);
 
-    //println!("{:#?}", ops);
-    //to_rust::to_rust(&ops, &state.strings);
-
-    std::fs::write("last_compiled/src/main.rs", to_rust2::CompilationContext::new(&mut state.strings).compile_script(ast.clone())).unwrap();
+    let t5 = std::time::Instant::now();
+    std::fs::write("last_compiled/src/main.rs", to_rust::CompilationContext::new(&mut state.strings).compile_script(ast.clone())).unwrap();
 
     /*let py = to_python::CompilationContext::new(&mut state.strings).compile_script(ast.clone());
     println!("{}", dbg!(py).into_python_src(0, false, &mut state.strings));*/
 
-    let t5 = std::time::Instant::now();
+    let t6 = std::time::Instant::now();
     vm::run_script(&ops, vm_env, &state.strings);
 
-    let t6 = std::time::Instant::now();
+    let t7 = std::time::Instant::now();
     let mut ctx = interpreter::Context::new(interpreter_state, &mut state.strings);
     for stmt in ast {
         ctx.exec(&stmt);
     }
 
-    let t7 = std::time::Instant::now();
+    let t8 = std::time::Instant::now();
 
     let t_total = t7 - t0;
     let t_parse = t1 - t0;
@@ -109,10 +106,11 @@ fn exec(
     let t_check = t3 - t2;
     let t_compile = t4 - t3;
     let t_opt = t5 - t4;
-    let t_exec = t6 - t5;
-    let t_interpret = t7 - t6;
+    let t_rust = t6 - t5;
+    let t_exec = t7 - t6;
+    let t_interpret = t8 - t7;
     eprintln!(
-        "{t_total:?} : (parse: {t_parse:?}, expand: {t_expand:?}, type-check: {t_check:?}, compile: {t_compile:?}, opt: {t_opt:?}, exec: {t_exec:?}, interpret: {t_interpret:?})"
+        "{t_total:?} : (parse: {t_parse:?}, expand: {t_expand:?}, type-check: {t_check:?}, compile: {t_compile:?}, opt: {t_opt:?}, rust: {t_rust:?}, exec: {t_exec:?}, interpret: {t_interpret:?})"
     );
     Ok(())
 }
