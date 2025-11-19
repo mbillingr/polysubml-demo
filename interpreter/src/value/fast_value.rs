@@ -15,24 +15,6 @@ pub type Int = num_bigint::BigInt;
 pub struct Value(*mut u8);
 
 #[derive(Debug)]
-pub enum Object {
-    Int(Int),
-    String(String),
-
-    Case(StringId, Value),
-    Record(HashMap<StringId, Value>),
-
-    Callable(Func),
-
-    Env(vm::Env),
-
-    Vect(Vector<Value>),
-    Dict(ImHashMap<Value, Value>),
-
-    PBar(ProgressBar),
-}
-
-#[derive(Debug)]
 pub enum Func {
     Func(ast::LetPattern, ast::Expr, Env),
     Func2(Rc<Vec<Op>>, vm::Env),
@@ -44,16 +26,20 @@ impl Value {
         Value(std::ptr::null_mut())
     }
 
-    fn new_ptr(x: Object) -> Value {
-        Value(Box::leak(Box::new(x)) as *mut _ as _)
+    fn new_ptr<T>(x: T) -> Value {
+        Self::new_boxed(Box::new(x))
     }
 
-    fn as_obj(&self) -> &Object {
-        unsafe { &*(self.0 as *const Object) }
+    fn new_boxed<T>(x: Box<T>) -> Value {
+        Value(Box::leak(x) as *mut _ as _)
     }
 
-    fn as_obj_mut(&self) -> &mut Object {
-        unsafe { &mut *(self.0 as *mut Object) }
+    fn as_<T>(&self) -> &T {
+        unsafe { &*(self.0 as *const T) }
+    }
+
+    fn as_mut<T>(&self) -> &mut T {
+        unsafe { &mut *(self.0 as *mut T) }
     }
 
     pub fn bool(b: bool) -> Value {
@@ -65,18 +51,15 @@ impl Value {
     }
 
     pub fn int(i: Int) -> Value {
-        Value::new_ptr(Object::Int(i))
+        Value::new_ptr(i)
     }
 
     pub fn usize(i: usize) -> Value {
-        Value::new_ptr(Object::Int(i.into()))
+        Value::int(i.into())
     }
 
     pub fn as_int(&self) -> &Int {
-        match self.as_obj() {
-            Object::Int(i) => i,
-            _ => unimplemented!(),
-        }
+        self.as_()
     }
 
     pub fn float(f: f64) -> Value {
@@ -92,114 +75,89 @@ impl Value {
     }
 
     pub fn string(s: String) -> Value {
-        Value::new_ptr(Object::String(s))
+        Value::new_ptr(s.into_boxed_str())
     }
 
     pub fn as_str(&self) -> &str {
-        match self.as_obj() {
-            Object::String(s) => s.as_str(),
-            _ => unimplemented!(),
-        }
+        self.as_::<Box<str>>().as_ref()
     }
 
     pub fn case(tag: StringId, val: Self) -> Value {
-        Value::new_ptr(Object::Case(tag, val))
+        Value::new_ptr((tag, val))
     }
 
     pub fn record(fields: impl IntoIterator<Item = (StringId, Value, bool)>) -> Value {
-        Value::new_ptr(Object::Record(fields.into_iter().map(|(k, v, _)| (k, v)).collect()))
+        let rec: HashMap<StringId, Value> = fields.into_iter().map(|(k, v, _)| (k, v)).collect();
+        Value::new_ptr(rec)
     }
 
     pub fn func(param: ast::LetPattern, expr: ast::Expr, env: Env) -> Value {
-        Value::new_ptr(Object::Callable(Func::Func(param, expr, env)))
+        Value::new_ptr(Func::Func(param, expr, env))
     }
 
     pub fn func2(body: Rc<Vec<Op>>, env: vm::Env) -> Value {
-        Value::new_ptr(Object::Callable(Func::Func2(body, env)))
+        Value::new_ptr(Func::Func2(body, env))
     }
 
     pub fn builtin(f: impl Fn(Value, &mut builtins::Context) -> Value + 'static) -> Value {
-        Value::new_ptr(Object::Callable(Func::Builtin(Builtin(Arc::new(f)))))
+        Value::new_ptr(Func::Builtin(Builtin(Arc::new(f))))
     }
 
     pub fn as_func(&self) -> &Func {
-        match self.as_obj() {
-            Object::Callable(f) => f,
-            _ => unimplemented!(),
-        }
+        self.as_()
     }
 
     pub fn env(env: vm::Env) -> Self {
-        Value::new_ptr(Object::Env(env))
+        Value::new_ptr(env)
     }
 
     pub fn into_env(self) -> vm::Env {
-        match self.as_obj() {
-            Object::Env(env) => env.clone(),
-            _ => unimplemented!(),
-        }
+        self.as_::<vm::Env>().clone()
     }
 
     pub fn vect(data: impl Into<Vector<Value>>) -> Value {
-        Value::new_ptr(Object::Vect(data.into()))
+        Value::new_ptr(data.into())
     }
 
     pub fn as_vect(&self) -> &Vector<Value> {
-        match self.as_obj() {
-            Object::Vect(v) => v,
-            _ => unimplemented!(),
-        }
+        self.as_()
     }
 
     pub fn dict(data: impl Into<ImHashMap<Value, Value>>) -> Value {
-        Value::new_ptr(Object::Dict(data.into()))
+        Value::new_ptr(data.into())
     }
 
     pub fn as_dict(&self) -> &ImHashMap<Value, Value> {
-        match self.as_obj() {
-            Object::Dict(d) => d,
-            _ => unimplemented!(),
-        }
+        self.as_()
     }
 }
 
 impl Value {
     pub fn as_case(&self) -> (StringId, &Value) {
-        match self.as_obj() {
-            Object::Case(tag, val) => (*tag, val),
-            _ => unimplemented!(),
-        }
+        let (tag, val) = self.as_::<(StringId, Value)>();
+        (*tag, val)
     }
 
     pub fn get_field(&self, field: StringId) -> Value {
-        match self.as_obj() {
-            Object::Record(rec) => rec.get(&field).cloned().unwrap(),
-            _ => unimplemented!(),
-        }
+        self.as_::<HashMap<StringId, Value>>().get(&field).cloned().unwrap()
     }
 
     pub fn set_field(&self, field: StringId, val: Value) -> Value {
-        match self.as_obj_mut() {
-            Object::Record(rec) => rec.insert(field, val).unwrap(),
-            _ => unimplemented!(),
-        }
+        self.as_mut::<HashMap<StringId, Value>>().insert(field, val).unwrap()
     }
 }
 
 impl Value {
     pub fn pbar(n: Option<u64>) -> Value {
-        Value::new_ptr(Object::PBar(if let Some(n) = n {
+        Value::new_ptr(if let Some(n) = n {
             ProgressBar::new(n)
         } else {
             ProgressBar::no_length()
-        }))
+        })
     }
 
     pub fn as_pbar(&self) -> &ProgressBar {
-        match self.as_obj() {
-            Object::PBar(p) => p,
-            _ => unimplemented!(),
-        }
+        self.as_()
     }
 }
 
