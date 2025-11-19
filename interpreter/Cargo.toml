@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+bdwgc-alloc = "0.6.11"
 compiler_lib = { path = "../compiler_lib" }
 escape-bytes = "0.1.1"
 im-rc = "15.1"

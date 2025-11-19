@@ -3,12 +3,15 @@ use crate::interpreter::Env;
 use crate::{builtins, vm};
 use compiler_lib::ast::StringId;
 use compiler_lib::{Rodeo, ast};
+pub use im_rc::{HashMap as ImHashMap, Vector};
+use indicatif::ProgressBar;
 use std::collections::HashMap;
+use std::rc::Rc;
 use std::sync::Arc;
 
 pub type Int = num_bigint::BigInt;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Value(*mut u8);
 
 #[derive(Debug)]
@@ -23,13 +26,16 @@ pub enum Object {
 
     Env(vm::Env),
 
-    Vect(im::Vector<Value>),
+    Vect(Vector<Value>),
+    Dict(ImHashMap<Value, Value>),
+
+    PBar(ProgressBar),
 }
 
 #[derive(Debug)]
 pub enum Func {
     Func(ast::LetPattern, ast::Expr, Env),
-    Func2(Arc<Vec<Op>>, vm::Env),
+    Func2(Rc<Vec<Op>>, vm::Env),
     Builtin(Builtin),
 }
 
@@ -100,15 +106,15 @@ impl Value {
         Value::new_ptr(Object::Case(tag, val))
     }
 
-    pub fn record(fields: impl Iterator<Item = (StringId, Value)>) -> Value {
-        Value::new_ptr(Object::Record(fields.collect()))
+    pub fn record(fields: impl IntoIterator<Item = (StringId, Value, bool)>) -> Value {
+        Value::new_ptr(Object::Record(fields.into_iter().map(|(k, v, _)| (k, v)).collect()))
     }
 
     pub fn func(param: ast::LetPattern, expr: ast::Expr, env: Env) -> Value {
         Value::new_ptr(Object::Callable(Func::Func(param, expr, env)))
     }
 
-    pub fn func2(body: Arc<Vec<Op>>, env: vm::Env) -> Value {
+    pub fn func2(body: Rc<Vec<Op>>, env: vm::Env) -> Value {
         Value::new_ptr(Object::Callable(Func::Func2(body, env)))
     }
 
@@ -134,13 +140,24 @@ impl Value {
         }
     }
 
-    pub fn vect(data: impl Into<im::Vector<Value>>) -> Value {
+    pub fn vect(data: impl Into<Vector<Value>>) -> Value {
         Value::new_ptr(Object::Vect(data.into()))
     }
 
-    pub fn as_vect(&self) -> &im::Vector<Value> {
+    pub fn as_vect(&self) -> &Vector<Value> {
         match self.as_obj() {
             Object::Vect(v) => v,
+            _ => unimplemented!(),
+        }
+    }
+
+    pub fn dict(data: impl Into<ImHashMap<Value, Value>>) -> Value {
+        Value::new_ptr(Object::Dict(data.into()))
+    }
+
+    pub fn as_dict(&self) -> &ImHashMap<Value, Value> {
+        match self.as_obj() {
+            Object::Dict(d) => d,
             _ => unimplemented!(),
         }
     }
@@ -170,14 +187,25 @@ impl Value {
 }
 
 impl Value {
-    pub fn show(&self, _r: &Rodeo) -> String {
-        format!("{:?}", self)
+    pub fn pbar(n: Option<u64>) -> Value {
+        Value::new_ptr(Object::PBar(if let Some(n) = n {
+            ProgressBar::new(n)
+        } else {
+            ProgressBar::no_length()
+        }))
+    }
+
+    pub fn as_pbar(&self) -> &ProgressBar {
+        match self.as_obj() {
+            Object::PBar(p) => p,
+            _ => unimplemented!(),
+        }
     }
 }
 
-impl std::cmp::PartialEq for Value {
-    fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
+impl Value {
+    pub fn show(&self, _r: &Rodeo) -> String {
+        format!("{:?}", self)
     }
 }
 

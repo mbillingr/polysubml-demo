@@ -19,7 +19,12 @@ use compiler_lib::spans::SpannedError;
 use std::collections::HashMap;
 use std::io::Write;
 
+#[global_allocator]
+static GLOBAL_ALLOCATOR: bdwgc_alloc::Allocator = bdwgc_alloc::Allocator;
+
 fn main() {
+    unsafe { bdwgc_alloc::Allocator::initialize() }
+
     let mut state = State::new();
     state.add_builtins();
 
@@ -84,7 +89,11 @@ fn exec(
     let ops = optimize::optimize(ops);
 
     let t5 = std::time::Instant::now();
-    std::fs::write("last_compiled/src/main.rs", to_rust::CompilationContext::new(&mut state.strings).compile_script(ast.clone())).unwrap();
+    std::fs::write(
+        "last_compiled/src/main.rs",
+        to_rust::CompilationContext::new(&mut state.strings).compile_script(ast.clone()),
+    )
+    .unwrap();
 
     /*let py = to_python::CompilationContext::new(&mut state.strings).compile_script(ast.clone());
     println!("{}", dbg!(py).into_python_src(0, false, &mut state.strings));*/
