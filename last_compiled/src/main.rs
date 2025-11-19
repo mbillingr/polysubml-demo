@@ -1,5 +1,5 @@
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-enum _Field { _0,_1,_2,i, }
+enum _Field { _0,_1,_2,n,x, }
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 enum _Tag { Break,Continue,Eof,Err,Loop,None,Ok,Some, }
 mod runtime; use runtime::*; 
@@ -143,13 +143,15 @@ let (panic, __read_line, __write_str, __chars, __split, __escape, __unescape, __
     });
 
     (__panic, __read_line, __write_str, __chars, __split, __escape, __unescape, __int_to_float, __float_to_int, __str_to_int, __str_to_float, __int_to_str, __float_to_str, __vec_new, __vec_length, __vec_push_back, __vec_pop_back, __vec_peek_back, __vec_push_front, __vec_pop_front, __vec_peek_front, __vec_get, __vec_set, __vec_split, __dict_new, __dict_length, __dict_insert, __dict_contains, __dict_remove, __dict_get)
-};let vars = Value::record([(_Field::i, Value::int_literal(0), true),]);
+};let r = Value::int_literal(7);
 
-let _ = loop { if let (_Tag::Break, res) = (if (Value::bool(((vars.clone()).get_field(_Field::i)).as_int() >= (Value::int_literal(50)).as_int())).as_bool() { Value::case(_Tag::Break, Value::int_literal(0)) } else { {
-let i = (vars.clone()).set_field(_Field::i, Value::int(((vars.clone()).get_field(_Field::i)).as_int() + (Value::int_literal(1)).as_int()));
-println!("{}", if (Value::bool((Value::int((i.clone()).as_int() % (Value::int_literal(3)).as_int())) == (Value::int_literal(0)))).as_bool() { if (Value::bool((Value::int((i.clone()).as_int() % (Value::int_literal(5)).as_int())) == (Value::int_literal(0)))).as_bool() { Value::str("FizzBuzz") } else { Value::str("Fizz") } } else { if (Value::bool((Value::int((i.clone()).as_int() % (Value::int_literal(5)).as_int())) == (Value::int_literal(0)))).as_bool() { Value::str("Buzz") } else { i.clone() } });
+let vars = Value::record([(_Field::x, Value::int_literal(5), true),(_Field::n, Value::int_literal(10000000), true),]);
+
+let _ = loop { if let (_Tag::Break, res) = (if (Value::bool(((vars.clone()).set_field(_Field::n, Value::int(((vars.clone()).get_field(_Field::n)).as_int() - (Value::int_literal(1)).as_int()))).as_int() <= (Value::int_literal(0)).as_int())).as_bool() { Value::case(_Tag::Break, Value::int_literal(0)) } else { {
+let _ = (vars.clone()).set_field(_Field::x, Value::int((Value::int((Value::int((r.clone()).as_int() * ((vars.clone()).get_field(_Field::x)).as_int())).as_int() + (Value::int_literal(9)).as_int())).as_int() % (Value::int_literal(750317)).as_int()));
 Value::case(_Tag::Continue, Value::int_literal(0))
 } }).as_case() { break res.clone() } };
 
+println!("{}", (vars.clone()).get_field(_Field::x));
 
 }

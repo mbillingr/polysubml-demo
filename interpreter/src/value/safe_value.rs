@@ -4,6 +4,7 @@ use crate::{builtins, vm};
 use compiler_lib::ast::StringId;
 use compiler_lib::{Rodeo, ast};
 pub use im_rc::{HashMap as ImHashMap, Vector};
+use indicatif::ProgressBar;
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 use std::fmt::Formatter;
@@ -30,6 +31,8 @@ pub enum Value {
 
     Vect(Vector<Value>),
     Dict(ImHashMap<Value, Value>),
+
+    PBar(ProgressBar),
 }
 
 #[derive(Clone, Debug)]
@@ -220,6 +223,23 @@ impl Value {
 }
 
 impl Value {
+    pub fn pbar(n: Option<u64>) -> Value {
+        if let Some(n) = n {
+            Value::PBar(ProgressBar::new(n))
+        } else {
+            Value::PBar(ProgressBar::no_length())
+        }
+    }
+
+    pub fn as_pbar(&self) -> &ProgressBar {
+        match self {
+            Value::PBar(p) => p,
+            _ => unimplemented!(),
+        }
+    }
+}
+
+impl Value {
     pub fn show(&self, r: &Rodeo) -> String {
         match self {
             Value::Nothing => "()".to_string(),
@@ -267,6 +287,8 @@ impl Value {
                 s.push('}');
                 s
             }
+
+            Value::PBar(_) => "<progress bar>".to_string(),
         }
     }
 }
@@ -327,6 +349,7 @@ impl std::hash::Hash for Value {
             Value::Env(e) => e.hash(state),
             Value::Vect(v) => v.hash(state),
             Value::Dict(d) => d.hash(state),
+            Value::PBar(_) => ().hash(state),
         }
     }
 }

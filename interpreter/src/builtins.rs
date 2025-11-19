@@ -147,6 +147,32 @@ pub fn define_builtins(env: Env, vm_env: vm::Env, strings: &mut Rodeo) -> (Env, 
         d.get(&k).cloned()
     });
 
+    bb.bind("__progress_bar_new", |n, _| Value::pbar(n.as_int().to_u64()));
+    bb.bind("__progress_bar_step", move |args, _| {
+        let pb = args.get_field(idx0);
+        let pb = pb.as_pbar();
+        if let Some(delta) = args.get_field(idx1).as_int().to_i64() {
+            if delta < 0 {
+                pb.dec((-delta) as u64);
+            } else {
+                pb.inc(delta as u64);
+            }
+        }
+        Value::nothing()
+    });
+    bb.bind("__progress_bar_setlen", move |args, _| {
+        let pb = args.get_field(idx0);
+        let pb = pb.as_pbar();
+        if let Some(n) = args.get_field(idx1).as_int().to_u64() {
+            pb.set_length(n)
+        }
+        Value::nothing()
+    });
+    bb.bind("__progress_bar_finish", |pb, _| {
+        pb.as_pbar().finish();
+        Value::nothing()
+    });
+
     (bb.env, bb.vm_env)
 }
 

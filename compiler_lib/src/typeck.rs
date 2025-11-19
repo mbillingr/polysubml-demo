@@ -140,6 +140,14 @@ impl TypeckState {
             strings,
         );
 
+        let ty_progress_name = strings.get_or_intern_static("progress_bar");
+        let ty_progress = self.core.add_builtin_type(ty_progress_name);
+        self.bindings.types.insert(ty_progress_name, ty_progress);
+        self.declare_builtin("__progress_bar_new", "int -> progress_bar", smgr, strings);
+        self.declare_builtin("__progress_bar_step", "(progress_bar * int) -> any", smgr, strings);
+        self.declare_builtin("__progress_bar_setlen", "(progress_bar * int) -> any", smgr, strings);
+        self.declare_builtin("__progress_bar_finish", "progress_bar -> any", smgr, strings);
+
         self.bindings.make_permanent(n);
     }
 
