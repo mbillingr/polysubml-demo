@@ -19,11 +19,11 @@ use compiler_lib::spans::SpannedError;
 use std::collections::HashMap;
 use std::io::Write;
 
-#[global_allocator]
-static GLOBAL_ALLOCATOR: bdwgc_alloc::Allocator = bdwgc_alloc::Allocator;
+//#[global_allocator]
+//static GLOBAL_ALLOCATOR: bdwgc_alloc::Allocator = bdwgc_alloc::Allocator;
 
 fn main() {
-    unsafe { bdwgc_alloc::Allocator::initialize() }
+    //unsafe { bdwgc_alloc::Allocator::initialize() }
 
     let mut state = State::new();
     state.add_builtins();
