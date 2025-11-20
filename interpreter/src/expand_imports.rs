@@ -1,9 +1,9 @@
-use crate::expand::expand_syntax;
+use crate::expand::expand_syntax_inner;
 use compiler_lib::grammar::ModuleParser;
 use compiler_lib::spans::{Span, SpanManager, SpannedError};
 use compiler_lib::{Rodeo, ast, convert_parse_error};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::Path;
 
 /// Recursively expands `import "path/module.ml"` into
 /// `let <priv.module> = <content of foo/module.ml>` and `let module = <priv.module>`.
@@ -12,25 +12,25 @@ use std::path::PathBuf;
 /// be shadowed by any grammatical variable names.
 pub fn expand_imports(
     stmts: Vec<ast::Statement>,
-    current_path: PathBuf,
+    current_path: &Path,
+    module_defs: &mut Vec<ast::Statement>,
     spans: &mut SpanManager,
     strings: &mut Rodeo,
     known_modules: &mut HashMap<ast::StringId, Option<ast::StringId>>,
 ) -> Result<Vec<ast::Statement>, SpannedError> {
     let mut ctx = ImportExpansion {
         current_path,
-        module_defs: vec![],
+        module_defs,
         spans,
         strings,
         known_modules,
     };
-    let out = ctx.expand_stmts(stmts)?;
-    Ok(ctx.module_defs.into_iter().chain(out).collect())
+    ctx.expand_stmts(stmts)
 }
 
 struct ImportExpansion<'a> {
-    current_path: PathBuf,
-    module_defs: Vec<ast::Statement>,
+    current_path: &'a Path,
+    module_defs: &'a mut Vec<ast::Statement>,
     spans: &'a mut SpanManager,
     strings: &'a mut Rodeo,
     known_modules: &'a mut HashMap<ast::StringId, Option<ast::StringId>>,
@@ -86,9 +86,14 @@ impl<'a> ImportExpansion<'a> {
                                 .parse(&mut ctx, &src)
                                 .map_err(|e| convert_parse_error(ctx.span_maker, e))?;
 
-                            let old_path = std::mem::replace(&mut self.current_path, path.parent().unwrap().to_owned());
-                            let mut module_ast = expand_syntax(module_ast, self.spans, self.strings, self.known_modules)?;
-                            self.current_path = old_path;
+                            let mut module_ast = expand_syntax_inner(
+                                module_ast,
+                                path.parent().unwrap(),
+                                self.module_defs,
+                                self.spans,
+                                self.strings,
+                                self.known_modules,
+                            )?;
 
                             let module_name = self.strings.get_or_intern(mod_name);
                             self.known_modules.insert(module_private_name, Some(module_name));

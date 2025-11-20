@@ -326,8 +326,8 @@ impl PartialEq for Value {
             (Record(a), Record(b)) => Rc::ptr_eq(a, b),
             (Callable(a), Callable(b)) => Rc::ptr_eq(a, b),
             (Env(a), Env(b)) => a == b,
-            (Vect(a), Vect(b)) => a.ptr_eq(b),
-            (Dict(a), Dict(b)) => a.ptr_eq(b),
+            (Vect(a), Vect(b)) => a.is_empty() && b.is_empty() || a.ptr_eq(b),
+            (Dict(a), Dict(b)) => a.is_empty() && b.is_empty() || a.ptr_eq(b),
             _ => false,
         }
     }
@@ -347,6 +347,8 @@ impl std::hash::Hash for Value {
             Value::Record(a) => Rc::as_ptr(a).hash(state),
             Value::Callable(a) => Rc::as_ptr(a).hash(state),
             Value::Env(e) => e.hash(state),
+            Value::Vect(v) if v.is_empty() => ().hash(state),
+            Value::Dict(d) if d.is_empty() => ().hash(state),
             Value::Vect(v) => v.hash(state),
             Value::Dict(d) => d.hash(state),
             Value::PBar(_) => ().hash(state),

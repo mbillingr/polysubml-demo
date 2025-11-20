@@ -1,0 +1,124 @@
+let type <<iter t>> = any -> [`Some t | `None any];
+
+let empty: (vec@never) = __vec_new {};
+let length = __vec_length;
+let peek = __vec_get;
+let peek_front = __vec_peek_front;
+let peek_back = __vec_peek_back;
+let push_front = __vec_push_front;
+let push_back = __vec_push_back;
+let pop_front = __vec_pop_front;
+let pop_back = __vec_pop_back;
+let split = __vec_split;
+
+let iter = fun (type a) (lst : vec@a) : (<<iter a>>) ->
+    let state = {mut i = 0} in
+        fun _ -> peek(lst, (state.i <- state.i + 1));
+
+let rec is_empty = fun xs -> (length xs) == 0
+
+     and front = fun (type a) (xs: (vec@a)) : a ->
+      match peek_front xs with
+        | `None _ -> panic "empty vec"
+        | `Some x -> x
+
+     and back = fun (type a) (xs: (vec@a)) : a ->
+      match peek_back xs with
+        | `None _ -> panic "empty vec"
+        | `Some x -> x
+
+     and get = fun (type a) (xs: (vec@a), i: int) : a ->
+      match peek(xs, i) with
+        | `None _ -> panic "index out of range"
+        | `Some x -> x
+
+    and foldl = fun (type a b) (f : (b*a)->b, init : b, lst : vec@a) : b ->
+      let vars = {mut acc=init; mut i=0} in
+      loop
+        match peek(lst, (vars.i <- vars.i + 1)) with
+          | `None _ -> `Break vars.acc
+          | `Some x -> begin
+              vars.acc <- f(vars.acc, x);
+              `Continue {}
+            end
+
+    and foldr = fun (type a b) (f : (a*b)->b, init : b, lst : vec@a) : b ->
+      let vars = {mut acc=init; mut i=length lst - 1} in
+      loop
+        match peek(lst, (vars.i <- vars.i - 1)) with
+          | `None _ -> `Break vars.acc
+          | `Some x -> begin
+              vars.acc <- f(x, vars.acc);
+              `Continue {}
+            end
+
+    and map = fun (type a b) (f : a->b, lst : vec@a) : (vec@b) ->
+      foldl ((fun (xs, x) -> push_back(xs, f x)), empty, lst)
+
+    and filter = fun (type a) (f : a->bool, lst : vec@a) : (vec@a) ->
+      foldl ((fun (xs, x) -> if f x then push_back(xs, x) else xs), empty, lst)
+
+    and append = fun (type a) (xs : vec@a, ys : vec@a) : (vec@a) ->
+      foldl (push_back[a=a], xs, ys)
+
+    and reverse = fun (type a) (xs : vec@a) : (vec@a) ->
+      foldl (push_front[a=a], empty, xs)
+
+    and merge_sorted = fun (type a) (cmp : ((a*a)->bool), xs : vec@a, ys : vec@a) : (vec@a) ->
+        let vars = {mut xs; mut ys; mut acc=empty} in
+        loop (
+            let xo = peek_back vars.xs;
+            let yo = peek_back vars.ys;
+            let choice = match xo with
+              | `None _ ->
+                (match yo with
+                  | `None _ -> `Break vars.acc
+                  | `Some y -> `Y y)
+              | `Some x ->
+                (match yo with
+                  | `None _ -> `X x
+                  | `Some y -> (if cmp(y, x) then `X x else `Y y));
+            match choice with
+              | `X x -> (
+                vars.acc <- push_front(vars.acc, x);
+                vars.xs <- pop_back vars.xs;
+                `Continue {}
+              )
+              | `Y y -> (
+                vars.acc <- push_front(vars.acc, y);
+                vars.ys <- pop_back vars.ys;
+                `Continue {}
+              )
+              | other -> other
+        )
+
+    and sort = fun (type a) (cmp : ((a*a)->bool), xs : vec@a) : (vec@a) ->
+        if length xs < 2 then xs else
+        let (lhs, rhs) = split(xs, (__vec_length xs) / 2) in
+            merge_sorted(cmp, sort(cmp, lhs), sort(cmp, rhs))
+
+    and collect_rev = fun (type a) (it: <<iter a>>) : (vec@a) -> (
+      let vars = {mut out = empty};
+      loop
+        match it {} with
+          | `None _ -> `Break vars.out
+          | `Some x -> (
+                vars.out <- push_front(vars.out, x);
+                `Continue {}
+          ))
+
+    and collect = fun (type a) (it: <<iter a>>) : (vec@a) -> (
+      let vars = {mut out = empty};
+      loop
+        match it {} with
+          | `None _ -> `Break vars.out
+          | `Some x -> (
+                vars.out <- push_back(vars.out, x);
+                `Continue {}
+          ))
+;
+
+{
+    append; back; collect; collect_rev; empty; filter; foldl; foldr; front; get; is_empty; iter; length; map;
+    merge_sorted; peek; peek_back; peek_front; pop_back; pop_front; push_back; push_front; reverse; sort; split
+}

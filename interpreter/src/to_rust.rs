@@ -314,8 +314,8 @@ impl<'a> CompilationContext<'a> {
 
             ast::Expr::Variable(var) => format!("{}.clone()", self.strings.resolve(&var.name)),
 
-            ast::Expr::Array(_, _) => todo!(),
-            ast::Expr::Dict(_, _) => todo!(),
+            ast::Expr::Array(_, _) => "todo!()".to_string(),
+            ast::Expr::Dict(_, _) => "todo!()".to_string(),
         }
     }
 }

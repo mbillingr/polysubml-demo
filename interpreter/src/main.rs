@@ -13,9 +13,9 @@ mod vm;
 
 use crate::compiler::CompilationContext;
 use crate::expand::expand_syntax;
-use compiler_lib::State;
-use compiler_lib::ast::StringId;
-use compiler_lib::spans::SpannedError;
+use compiler_lib::ast::{LetPattern, StringId};
+use compiler_lib::spans::{Spanned, SpannedError};
+use compiler_lib::{Rodeo, State};
 use std::collections::HashMap;
 use std::io::Write;
 
@@ -74,7 +74,17 @@ fn exec(
     let ast = state.parse(&src)?;
 
     let t1 = std::time::Instant::now();
-    let ast = expand_syntax(ast, &mut state.spans, &mut state.strings, known_modules)?;
+    let ast = expand_syntax(
+        ast,
+        &std::env::current_dir().unwrap(),
+        &mut state.spans,
+        &mut state.strings,
+        known_modules,
+    )?;
+
+    for stmt in &ast {
+        println!("{};", stmt.simple_print(0, &state.strings));
+    }
 
     let t2 = std::time::Instant::now();
     state.check(&ast)?;
@@ -122,4 +132,229 @@ fn exec(
         "{t_total:?} : (parse: {t_parse:?}, expand: {t_expand:?}, type-check: {t_check:?}, compile: {t_compile:?}, opt: {t_opt:?}, rust: {t_rust:?}, exec: {t_exec:?}, interpret: {t_interpret:?})"
     );
     Ok(())
+}
+
+trait SimplePrint {
+    fn simple_print(&self, indent: usize, strings: &compiler_lib::Rodeo) -> String;
+}
+
+impl SimplePrint for compiler_lib::ast::Statement {
+    fn simple_print(&self, indent: usize, strings: &Rodeo) -> String {
+        use compiler_lib::ast::Statement::*;
+        match self {
+            Empty => "<nop>".to_string(),
+            Expr(x) => x.simple_print(indent, strings),
+            LetDef((pat, val)) => format!(
+                "let {} = {}",
+                pat.simple_print(indent, strings),
+                val.simple_print(indent, strings)
+            ),
+            LetRecDef(defs) => {
+                let mut out = "let rec\n".to_string();
+                let let_indent = indent + 1;
+                for (name, expr) in defs {
+                    out += &make_indent(let_indent);
+                    out += strings.resolve(name);
+                    out += " = ";
+                    out += &expr.simple_print(let_indent, strings);
+                    out += "\n";
+                }
+                out += &make_indent(indent);
+                out
+            }
+            Println(exprs) => format!(
+                "print {}",
+                exprs
+                    .iter()
+                    .map(|x| x.simple_print(indent, strings))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+            Import((lib, _)) => format!("import {lib:?}"),
+            TypeDef(_) => todo!(),
+        }
+    }
+}
+
+impl SimplePrint for compiler_lib::ast::Expr {
+    fn simple_print(&self, indent: usize, strings: &Rodeo) -> String {
+        use compiler_lib::ast::Expr::*;
+        use compiler_lib::ast::Op;
+        match self {
+            BinOp(bop) => {
+                let op = match bop.op {
+                    Op::Add => "+",
+                    Op::Sub => "-",
+                    Op::Mult => "*",
+                    Op::Div => "/",
+                    Op::Rem => "%",
+                    Op::Lt => "<",
+                    Op::Lte => "<=",
+                    Op::Gt => ">",
+                    Op::Gte => ">=",
+                    Op::Eq => "==",
+                    Op::Neq => "!=",
+                };
+                format!(
+                    "({} {} {})",
+                    bop.lhs.simple_print(indent, strings),
+                    op,
+                    bop.rhs.simple_print(indent, strings)
+                )
+            }
+
+            Block(blk) => {
+                let mut out = "begin\n".to_string();
+                for stmt in &blk.statements {
+                    out += &make_indent(indent + 1);
+                    out += &stmt.simple_print(indent + 1, strings);
+                    out += ";\n";
+                }
+                out += &make_indent(indent + 1);
+                out += &blk.expr.simple_print(indent + 1, strings);
+                out += "\n";
+                out += &make_indent(indent);
+                out += "end";
+                out
+            }
+
+            Call(call) => format!(
+                "({} {})",
+                call.func.simple_print(indent, strings),
+                call.arg.simple_print(indent, strings)
+            ),
+
+            Case(cx) => format!("`{} {}", strings.resolve(&cx.tag.0), cx.expr.simple_print(indent, strings)),
+
+            FieldAccess(fa) => format!("{}.{}", fa.expr.simple_print(indent, strings), strings.resolve(&fa.field.0)),
+
+            FieldSet(fs) => format!(
+                "({}.{} <- {})",
+                fs.expr.simple_print(indent, strings),
+                strings.resolve(&fs.field.0),
+                fs.value.simple_print(indent, strings)
+            ),
+
+            FuncDef(fd) => format!(
+                "(fun {} -> {})",
+                fd.param.simple_print(indent, strings),
+                fd.body.simple_print(indent, strings)
+            ),
+
+            If(if_) => {
+                let mut out = format!("if {}\n", if_.cond.simple_print(indent, strings));
+                out += &make_indent(indent + 1);
+                out += "then ";
+                out += &if_.then_expr.simple_print(indent + 1, strings);
+                out += "\n";
+                out += &make_indent(indent + 1);
+                out += "else ";
+                out += &if_.else_expr.simple_print(indent + 1, strings);
+                out += "\n";
+                out += &make_indent(indent);
+                out
+            }
+
+            InstantiateExist(ie) => ie.expr.simple_print(indent, strings),
+            InstantiateUni(iu) => iu.expr.simple_print(indent, strings),
+
+            Literal(lit) => lit.value.0.clone(),
+
+            Loop(lp) => {
+                let mut out = "loop\n".to_string();
+                out += &make_indent(indent + 1);
+                out += &lp.body.simple_print(indent + 1, strings);
+                out += "\n";
+                out += &make_indent(indent);
+                out
+            }
+
+            Match(mtch) => {
+                let mut out = format!("match {} with\n", mtch.expr.simple_print(indent, strings));
+
+                for (pat, expr) in &mtch.cases {
+                    out += &make_indent(indent + 1);
+                    out += &pat.simple_print(indent + 1, strings);
+                    out += " -> ";
+                    out += &expr.simple_print(indent + 1, strings);
+                    out += "\n";
+                }
+                out += &make_indent(indent);
+                out
+            }
+
+            Record(rec) => format!(
+                "{{{}}}",
+                rec.fields
+                    .iter()
+                    .map(|(k, v, m, _)| {
+                        format!(
+                            "{}{}={}",
+                            if *m { "mut " } else { "" },
+                            strings.resolve(&k.0),
+                            v.simple_print(indent, strings)
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join("; ")
+            ),
+
+            Typed(tx) => tx.expr.simple_print(indent, strings),
+
+            Variable(v) => strings.resolve(&v.name).to_string(),
+
+            Array(_, elems) => format!(
+                "#[{}]",
+                elems
+                    .iter()
+                    .map(|x| x.simple_print(indent, strings))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+
+            Dict(_, elems) => format!(
+                "#{{{}}}",
+                elems
+                    .iter()
+                    .map(|(k, v)| format!("{}: {}", k.simple_print(indent, strings), v.simple_print(indent, strings)))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+        }
+    }
+}
+
+impl SimplePrint for LetPattern {
+    fn simple_print(&self, indent: usize, strings: &Rodeo) -> String {
+        use compiler_lib::ast::LetPattern::*;
+        match self {
+            Var((None, _), _) => "_".to_string(),
+            Var((Some(v), _), _) => strings.resolve(v).to_string(),
+            Case((tag, _), pat) => format!("`{} {}", strings.resolve(tag), pat.simple_print(indent, strings)),
+            Record(((_, fields), _)) => format!(
+                "{{{}}}",
+                fields
+                    .iter()
+                    .map(|((f, _), p)| format!("{}={}", strings.resolve(f), p.simple_print(indent, strings)))
+                    .collect::<Vec<_>>()
+                    .join("; ")
+            ),
+        }
+    }
+}
+
+impl<T: SimplePrint> SimplePrint for Spanned<T> {
+    fn simple_print(&self, indent: usize, strings: &Rodeo) -> String {
+        self.0.simple_print(indent, strings)
+    }
+}
+
+impl<T: SimplePrint> SimplePrint for Box<T> {
+    fn simple_print(&self, indent: usize, strings: &Rodeo) -> String {
+        (**self).simple_print(indent, strings)
+    }
+}
+
+fn make_indent(indent: usize) -> String {
+    " ".repeat(indent * 4)
 }

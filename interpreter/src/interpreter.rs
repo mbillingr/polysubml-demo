@@ -92,11 +92,17 @@ impl<'a> Context<'a> {
             }
 
             ast::Expr::Block(block) => {
+                let outer_env = self.state.env.clone();
+
                 for stmt in &block.statements {
                     self.exec(stmt);
                 }
 
-                self.eval(&block.expr.0)
+                let result = self.eval(&block.expr.0);
+
+                self.state.env = outer_env;
+
+                result
             }
 
             ast::Expr::Call(call) => {

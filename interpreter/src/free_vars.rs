@@ -98,7 +98,7 @@ impl<'a> AstVisitor for BoundVarsVisitor<'a> {
     }
 
     fn post_visit_pattern(&mut self, pattern: &ast::LetPattern) {
-        match dbg!(pattern) {
+        match pattern {
             ast::LetPattern::Var((Some(var), _), _) => {
                 self.fvs.remove(var);
             }
