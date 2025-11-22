@@ -6,7 +6,6 @@ mod expand;
 mod expand_imports;
 mod expand_types;
 mod free_vars;
-mod to_python;
 mod to_rust;
 mod value;
 
@@ -50,7 +49,6 @@ impl GlobalState {
             builtins::define_builtins(ast_interpreter::Env::new(), vm::Env::new(), &mut type_checker.strings);
 
         let processors: Vec<(_, Box<dyn AstProcessor>)> = vec![
-            ("Python Compiler", Box::new(to_python::State)),
             ("Rust Compiler", Box::new(to_rust::State)),
             ("Bytecode Interpreter", Box::new(bytecode_interpreter::State::new(vm_env))),
             ("Ast Interpreter", Box::new(ast_interpreter::State::new(env))),
