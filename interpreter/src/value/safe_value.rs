@@ -1,6 +1,7 @@
-use crate::compiler::Op;
-use crate::interpreter::Env;
-use crate::{builtins, vm};
+use crate::ast_interpreter::Env;
+use crate::builtins;
+use crate::bytecode_interpreter::compiler::Op;
+use crate::bytecode_interpreter::vm;
 use compiler_lib::ast::StringId;
 use compiler_lib::{Rodeo, ast};
 pub use im_rc::{HashMap as ImHashMap, Vector};

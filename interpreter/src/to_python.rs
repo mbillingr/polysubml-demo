@@ -1,5 +1,23 @@
+use crate::ast_processor::AstProcessor;
 use compiler_lib::ast::StringId;
 use compiler_lib::{Rodeo, ast};
+
+pub struct State;
+
+impl State {
+    pub fn run_script(&mut self, script: &[ast::Statement], strings: &mut Rodeo) {
+        let mut ctx = CompilationContext::new(strings);
+        let python_ast = ctx.compile_script(script.to_vec());
+        let python_target = python_ast.into_python_src(0, false, strings);
+        println!("{}", python_target);
+    }
+}
+
+impl AstProcessor for State {
+    fn process_script(&mut self, script: &[ast::Statement], strings: &mut Rodeo) {
+        State::run_script(self, script, strings);
+    }
+}
 
 pub struct CompilationContext<'a> {
     pub strings: &'a mut Rodeo,

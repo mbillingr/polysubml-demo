@@ -1,4 +1,4 @@
-use crate::compiler::Op;
+use crate::bytecode_interpreter::compiler::Op;
 use crate::value::{Func, ImHashMap, Value};
 use compiler_lib::ast::StringId;
 use compiler_lib::{Rodeo, ast};

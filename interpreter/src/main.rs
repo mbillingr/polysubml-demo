@@ -1,137 +1,146 @@
+mod ast_interpreter;
+mod ast_processor;
 mod builtins;
-mod compiler;
+mod bytecode_interpreter;
 mod expand;
 mod expand_imports;
 mod expand_types;
 mod free_vars;
-mod interpreter;
-mod optimize;
 mod to_python;
 mod to_rust;
 mod value;
-mod vm;
 
-use crate::compiler::CompilationContext;
+use crate::ast_processor::AstProcessor;
 use crate::expand::expand_syntax;
+use bytecode_interpreter::vm;
 use compiler_lib::ast::{LetPattern, StringId};
 use compiler_lib::spans::{Spanned, SpannedError};
 use compiler_lib::{Rodeo, State};
 use std::collections::HashMap;
 use std::io::Write;
-
 //#[global_allocator]
 //static GLOBAL_ALLOCATOR: bdwgc_alloc::Allocator = bdwgc_alloc::Allocator;
 
 fn main() {
     //unsafe { bdwgc_alloc::Allocator::initialize() }
 
-    let mut state = State::new();
-    state.add_builtins();
-
-    let (env, mut vm_env) = builtins::define_builtins(interpreter::Env::new(), vm::Env::new(), &mut state.strings);
-
-    let mut interpreter_state = interpreter::State::new(env);
-
-    let mut known_modules = Default::default();
+    let mut state = GlobalState::new();
 
     let args: Vec<String> = std::env::args().collect();
     if args.len() > 1 {
         let src = std::fs::read_to_string(&args[1]).unwrap();
-        match exec(&src, &mut state, &mut interpreter_state, &mut vm_env, &mut known_modules) {
-            Ok(_) => {}
-            Err(e) => {
-                eprintln!("ERROR\n{}", state.err_to_str(&e));
-            }
-        }
-        return;
-    }
-
-    let mut src = String::new();
-    loop {
-        print!("> ");
-        std::io::stdout().flush().unwrap();
-        src.clear();
-        std::io::stdin().read_line(&mut src).unwrap();
-
-        match exec(&src, &mut state, &mut interpreter_state, &mut vm_env, &mut known_modules) {
-            Ok(_) => {}
-            Err(e) => {
-                eprintln!("ERROR\n{}", state.err_to_str(&e));
-                continue;
-            }
-        }
+        state.run_script(&src);
+    } else {
+        state.repl();
     }
 }
 
-fn exec(
-    src: &str,
-    state: &mut State,
-    interpreter_state: &mut interpreter::State,
-    vm_env: &mut vm::Env,
-    known_modules: &mut HashMap<StringId, Option<StringId>>,
-) -> Result<(), SpannedError> {
-    let t0 = std::time::Instant::now();
-    let ast = state.parse(&src)?;
+struct GlobalState {
+    type_checker: State,
+    processors: Vec<(&'static str, Box<dyn AstProcessor>)>,
+    known_modules: HashMap<StringId, Option<StringId>>,
+}
 
-    let t1 = std::time::Instant::now();
-    let ast = expand_syntax(
-        ast,
-        &std::env::current_dir().unwrap(),
-        &mut state.spans,
-        &mut state.strings,
-        known_modules,
-    )?;
+impl GlobalState {
+    fn new() -> Self {
+        let mut type_checker = State::new();
+        type_checker.add_builtins();
 
-    for stmt in &ast {
-        println!("{};", stmt.simple_print(0, &state.strings));
+        let (env, vm_env) =
+            builtins::define_builtins(ast_interpreter::Env::new(), vm::Env::new(), &mut type_checker.strings);
+
+        let processors: Vec<(_, Box<dyn AstProcessor>)> = vec![
+            ("Python Compiler", Box::new(to_python::State)),
+            ("Rust Compiler", Box::new(to_rust::State)),
+            ("Bytecode Interpreter", Box::new(bytecode_interpreter::State::new(vm_env))),
+            ("Ast Interpreter", Box::new(ast_interpreter::State::new(env))),
+        ];
+
+        GlobalState {
+            type_checker,
+            processors,
+            known_modules: Default::default(),
+        }
     }
 
-    let t2 = std::time::Instant::now();
-    state.check(&ast)?;
-
-    let t3 = std::time::Instant::now();
-    let mut cmp = CompilationContext {
-        strings: &mut state.strings,
-    };
-    let ops = cmp.compile_script(ast.clone());
-
-    let t4 = std::time::Instant::now();
-    let ops = optimize::optimize(ops);
-
-    let t5 = std::time::Instant::now();
-    std::fs::write(
-        "last_compiled/src/main.rs",
-        to_rust::CompilationContext::new(&mut state.strings).compile_script(ast.clone()),
-    )
-    .unwrap();
-
-    /*let py = to_python::CompilationContext::new(&mut state.strings).compile_script(ast.clone());
-    println!("{}", dbg!(py).into_python_src(0, false, &mut state.strings));*/
-
-    let t6 = std::time::Instant::now();
-    vm::run_script(&ops, vm_env, &state.strings);
-
-    let t7 = std::time::Instant::now();
-    let mut ctx = interpreter::Context::new(interpreter_state, &mut state.strings);
-    for stmt in ast {
-        ctx.exec(&stmt);
+    fn strings(&mut self) -> &mut Rodeo {
+        &mut self.type_checker.strings
     }
 
-    let t8 = std::time::Instant::now();
+    fn err_to_str(&self, err: &SpannedError) -> String {
+        err.print(&self.type_checker.spans)
+    }
 
-    let t_total = t7 - t0;
-    let t_parse = t1 - t0;
-    let t_expand = t2 - t1;
-    let t_check = t3 - t2;
-    let t_compile = t4 - t3;
-    let t_opt = t5 - t4;
-    let t_rust = t6 - t5;
-    let t_exec = t7 - t6;
-    let t_interpret = t8 - t7;
-    eprintln!(
-        "{t_total:?} : (parse: {t_parse:?}, expand: {t_expand:?}, type-check: {t_check:?}, compile: {t_compile:?}, opt: {t_opt:?}, rust: {t_rust:?}, exec: {t_exec:?}, interpret: {t_interpret:?})"
-    );
-    Ok(())
+    pub fn repl(&mut self) {
+        let mut src = String::new();
+        loop {
+            print!("> ");
+            std::io::stdout().flush().unwrap();
+            src.clear();
+            std::io::stdin().read_line(&mut src).unwrap();
+
+            self.run_script(&src);
+        }
+    }
+
+    pub fn run_script(&mut self, src: &str) {
+        match self.exec(&src) {
+            Ok(_) => {}
+            Err(e) => {
+                eprintln!("ERROR\n{}", self.err_to_str(&e));
+            }
+        }
+    }
+
+    fn exec(&mut self, src: &str) -> Result<(), SpannedError> {
+        let mut times = vec![];
+
+        let t0 = std::time::Instant::now();
+        let ast = self.type_checker.parse(&src)?;
+
+        let t1 = std::time::Instant::now();
+        times.push(("parse", t1 - t0));
+
+        let ast = expand_syntax(
+            ast,
+            &std::env::current_dir().unwrap(),
+            &mut self.type_checker.spans,
+            &mut self.type_checker.strings,
+            &mut self.known_modules,
+        )?;
+
+        for stmt in &ast {
+            println!("{};", stmt.simple_print(0, self.strings()));
+        }
+
+        let t2 = std::time::Instant::now();
+        times.push(("expand", t1 - t0));
+
+        self.type_checker.check(&ast)?;
+
+        let mut t3 = std::time::Instant::now();
+        times.push(("type-check", t3 - t2));
+
+        for (name, proc) in &mut self.processors {
+            proc.process_script(&ast, &mut self.type_checker.strings);
+
+            let t4 = std::time::Instant::now();
+            times.push((*name, t4 - t3));
+            t3 = t4;
+        }
+
+        times.push(("total", t3 - t0));
+
+        eprintln!(
+            "{}",
+            times
+                .into_iter()
+                .map(|(name, t)| format!("{}: {:?}", name, t))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+        Ok(())
+    }
 }
 
 trait SimplePrint {

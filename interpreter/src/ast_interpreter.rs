@@ -1,3 +1,4 @@
+use crate::ast_processor::AstProcessor;
 use crate::builtins;
 use crate::value::{Builtin, Func};
 use crate::value::{ImHashMap, Value};
@@ -7,13 +8,28 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 use std::sync::Arc;
 
+pub struct State {
+    env: Env,
+}
+
+impl State {
+    pub fn run_script(&mut self, script: &[ast::Statement], strings: &mut Rodeo) {
+        let mut ctx = Context::new(self, strings);
+        for stmt in script {
+            ctx.exec(&stmt);
+        }
+    }
+}
+
+impl AstProcessor for State {
+    fn process_script(&mut self, script: &[ast::Statement], strings: &mut Rodeo) {
+        self.run_script(script, strings);
+    }
+}
+
 pub struct Context<'a> {
     pub state: &'a mut State,
     pub strings: &'a mut Rodeo,
-}
-
-pub struct State {
-    env: Env,
 }
 
 impl State {

@@ -1,6 +1,23 @@
+use crate::ast_processor::AstProcessor;
 use crate::free_vars::free_vars;
 use compiler_lib::{Rodeo, ast};
 use std::collections::BTreeSet;
+
+pub struct State;
+
+impl State {
+    pub fn run_script(&mut self, script: &[ast::Statement], strings: &mut Rodeo) {
+        let mut ctx = CompilationContext::new(strings);
+        let rust_target = ctx.compile_script(script.to_vec());
+        std::fs::write("last_compiled/src/main.rs", rust_target).unwrap();
+    }
+}
+
+impl AstProcessor for State {
+    fn process_script(&mut self, script: &[ast::Statement], strings: &mut Rodeo) {
+        State::run_script(self, script, strings);
+    }
+}
 
 pub struct CompilationContext<'a> {
     strings: &'a mut Rodeo,

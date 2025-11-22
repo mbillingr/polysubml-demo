@@ -1,6 +1,6 @@
-use crate::interpreter::Env;
+use crate::ast_interpreter::Env;
+use crate::bytecode_interpreter::vm;
 use crate::value::Value;
-use crate::vm;
 use compiler_lib::Rodeo;
 use compiler_lib::ast::StringId;
 use num::ToPrimitive;

@@ -1,4 +1,4 @@
-use crate::compiler::Op;
+use crate::bytecode_interpreter::compiler::Op;
 use std::collections::{BTreeSet, HashSet};
 use std::rc::Rc;
 

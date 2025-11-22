@@ -1,5 +1,5 @@
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-enum _Field { _0,_1,_2,foldr, }
+enum _Field { _0,_1,_2, }
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 enum _Tag { Break,Continue,Eof,Err,None,Ok,Some, }
 mod runtime; use runtime::*; 
@@ -143,9 +143,6 @@ let (panic, __read_line, __write_str, __chars, __split, __escape, __unescape, __
     });
 
     (__panic, __read_line, __write_str, __chars, __split, __escape, __unescape, __int_to_float, __float_to_int, __str_to_int, __str_to_float, __int_to_str, __float_to_str, __vec_new, __vec_length, __vec_push_back, __vec_pop_back, __vec_peek_back, __vec_push_front, __vec_pop_front, __vec_peek_front, __vec_get, __vec_set, __vec_split, __dict_new, __dict_length, __dict_insert, __dict_contains, __dict_remove, __dict_get)
-};println!("{}", ((vec.clone()).get_field(_Field::foldr)).apply(Value::record([(_Field::_0, Value::func({  move|arg| { let _rec_0 = arg;
-let b = _rec_0.get_field(_Field::_1);
-let a = _rec_0.get_field(_Field::_0);
- Value::int((a.clone()).as_int() + (b.clone()).as_int()) } }), false),(_Field::_1, Value::int_literal(0), false),(_Field::_2, xs.clone(), false),])));
+};println!("{}", Value::int_literal(42));
 
 }
