@@ -4,6 +4,7 @@ use crate::value::Value;
 use compiler_lib::Rodeo;
 use compiler_lib::ast::StringId;
 use num::ToPrimitive;
+use std::cell::RefCell;
 
 pub struct Context<'a> {
     pub strings: &'a Rodeo,
@@ -120,6 +121,28 @@ pub fn define_builtins(env: Env, vm_env: vm::Env, strings: &mut Rodeo) -> (Env, 
         let w = v.split_off(idx);
         Value::record(vec![(idx0, Value::vect(v), false), (idx1, Value::vect(w), false)])
     });
+    let none = bb.val_none.clone();
+    let some = bb.tag_some;
+    bb.bind("__vec_iter", move |args, _| {
+        let d = args.as_vect().clone();
+        let it = RefCell::new(d.into_iter());
+        let none = none.clone();
+        Value::builtin(move |_, _| match it.borrow_mut().next() {
+            None => none.clone(),
+            Some(x) => Value::case(some, x),
+        })
+    });
+    let none = bb.val_none.clone();
+    let some = bb.tag_some;
+    bb.bind("__vec_iter_rev", move |args, _| {
+        let d = args.as_vect().clone();
+        let it = RefCell::new(d.into_iter().rev());
+        let none = none.clone();
+        Value::builtin(move |_, _| match it.borrow_mut().next() {
+            None => none.clone(),
+            Some(x) => Value::case(some, x),
+        })
+    });
 
     bb.bind("__dict_new", |_, _| Value::dict(vec![]));
     bb.bind("__dict_length", |dict, _| Value::usize(dict.as_dict().len().into()));
@@ -145,6 +168,17 @@ pub fn define_builtins(env: Env, vm_env: vm::Env, strings: &mut Rodeo) -> (Env, 
         let d = args.get_field(idx0).as_dict().clone();
         let k = args.get_field(idx1);
         d.get(&k).cloned()
+    });
+    let none = bb.val_none.clone();
+    let some = bb.tag_some;
+    bb.bind("__dict_iter", move |args, _| {
+        let d = args.as_dict().clone();
+        let it = RefCell::new(d.into_iter());
+        let none = none.clone();
+        Value::builtin(move |_, _| match it.borrow_mut().next() {
+            None => none.clone(),
+            Some((k, v)) => Value::case(some, Value::record([(idx0, k.clone(), false), (idx1, v.clone(), false)])),
+        })
     });
 
     bb.bind("__progress_bar_new", |n, _| Value::pbar(n.as_int().to_u64()));

@@ -20,6 +20,14 @@ let rec range = fun (start: int, stop: int): (<<iter int>>) ->
                     | `None _ -> `Break vars.acc
                     | `Some x -> `Continue (vars.acc <- f(vars.acc, x))
 
+    // same as fold but function arguments swapped
+    and fold2 = fun (type a b) (f: (a*b)->b, init: b, it: <<iter a>>) : b ->
+        let vars = {mut acc=init} in
+            loop
+                match it {} with
+                    | `None _ -> `Break vars.acc
+                    | `Some x -> `Continue (vars.acc <- f(x, vars.acc))
+
     and for_each = fun (type a) (f: a -> any, it: <<iter a>>): any ->
         loop
             match it {} with
@@ -65,6 +73,14 @@ let rec range = fun (start: int, stop: int): (<<iter int>>) ->
             else
                 `None z
 
+    and zip = fun (type a b) (ia: <<iter a>>, ib: <<iter b>>) : (<<iter (a*b)>>) ->
+        fun _ ->
+            match ia {} with
+                | `Some x -> (match ib {} with
+                    | `Some y -> `Some (x, y)
+                    | none -> none)
+                | none -> none
+
 in {
-    range; fold; for_each; map; filter; skip; take
+    filter; fold; fold2; for_each; map; range; skip; take; zip
 }

@@ -122,6 +122,13 @@ impl TypeckState {
             strings,
         );
         self.declare_builtin("__vec_split", "type a. (vec@a) * int -> (vec@a) * (vec@a)", smgr, strings);
+        self.declare_builtin("__vec_iter", "type a. (vec@a) -> (_ -> [`Some a | `None any])", smgr, strings);
+        self.declare_builtin(
+            "__vec_iter_rev",
+            "type a. (vec@a) -> (_ -> [`Some a | `None any])",
+            smgr,
+            strings,
+        );
 
         self.declare_builtin("__dict_new", "any -> dict@never*never", smgr, strings);
         self.declare_builtin("__dict_length", "(dict@any*any) -> int", smgr, strings);
@@ -136,6 +143,12 @@ impl TypeckState {
         self.declare_builtin(
             "__dict_get",
             "type k v. ((dict@k*v) * k) -> [`Some v | `None any]",
+            smgr,
+            strings,
+        );
+        self.declare_builtin(
+            "__dict_iter",
+            "type k v. (dict@k*v) -> (_ -> [`Some k*v | `None any])",
             smgr,
             strings,
         );
