@@ -1,6 +1,7 @@
 use crate::ast_processor::AstProcessor;
 use crate::bytecode_interpreter::compiler::CompilationContext;
-use compiler_lib::{Rodeo, ast};
+use crate::runtime_ast as ast;
+use compiler_lib::Rodeo;
 
 pub mod compiler;
 pub mod optimize;

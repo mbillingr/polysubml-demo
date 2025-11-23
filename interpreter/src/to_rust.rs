@@ -1,6 +1,7 @@
 use crate::ast_processor::AstProcessor;
 use crate::free_vars::free_vars;
-use compiler_lib::{Rodeo, ast};
+use crate::runtime_ast as ast;
+use compiler_lib::Rodeo;
 use std::collections::BTreeSet;
 
 pub struct State;
@@ -82,10 +83,10 @@ impl<'a> CompilationContext<'a> {
         match stmt {
             ast::Statement::Empty => String::new(),
 
-            ast::Statement::Expr((expr, _)) => format!("let _ = {};\n", self.compile_expression(expr)),
+            ast::Statement::Expr(expr) => format!("let _ = {};\n", self.compile_expression(expr)),
 
-            ast::Statement::LetDef((pat, expr)) => {
-                let expr = self.compile_expression(expr.0);
+            ast::Statement::LetDef(pat, expr) => {
+                let expr = self.compile_expression(expr);
                 self.compile_pattern_assignment(pat, expr)
             }
 
@@ -94,7 +95,7 @@ impl<'a> CompilationContext<'a> {
                 for (name, _) in &defs {
                     out += &format!("let {} = Value::cell(Value::nothing());\n", self.strings.resolve(name));
                 }
-                for (name, (expr, _)) in defs {
+                for (name, expr) in defs {
                     let val = self.compile_expression(expr);
                     out += &format!("{}.update_cell({});\n", self.strings.resolve(&name), val);
                 }
@@ -108,33 +109,30 @@ impl<'a> CompilationContext<'a> {
                 out += "\", ";
                 out += &exprs
                     .into_iter()
-                    .map(|(e, _)| self.compile_expression(e))
+                    .map(|e| self.compile_expression(e))
                     .collect::<Vec<_>>()
                     .join(", ");
                 out += ");\n";
 
                 out
             }
-
-            ast::Statement::Import(_) => unimplemented!(),
-            ast::Statement::TypeDef(_) => unimplemented!(),
         }
     }
 
     fn compile_pattern_assignment(&mut self, pat: ast::LetPattern, expr: String) -> String {
         match pat {
-            ast::LetPattern::Var((None, _), _) => format!("let _ = {};\n", expr),
+            ast::LetPattern::Var(None) => format!("let _ = {};\n", expr),
 
-            ast::LetPattern::Var((Some(var), _), _) => format!("let {} = {};\n", self.strings.resolve(&var), expr),
+            ast::LetPattern::Var(Some(var)) => format!("let {} = {};\n", self.strings.resolve(&var), expr),
 
             ast::LetPattern::Case(_, inner_pat) => {
                 self.compile_pattern_assignment(*inner_pat, format!("({}).as_case().1", expr))
             }
 
-            ast::LetPattern::Record(((_, field_patterns), _)) => {
+            ast::LetPattern::Record(field_patterns) => {
                 let tmp = self.gensym("rec");
                 let mut out = format!("let {tmp} = {};\n", expr);
-                for ((field, _), inner_pat) in field_patterns.into_iter().rev() {
+                for (field, inner_pat) in field_patterns.into_iter().rev() {
                     self.fields.insert(self.strings.resolve(&field).to_string());
                     out += &self.compile_pattern_assignment(
                         *inner_pat,
@@ -147,13 +145,12 @@ impl<'a> CompilationContext<'a> {
     }
 
     fn compile_expression(&mut self, expr: ast::Expr) -> String {
-        use ast::Literal::*;
+        use compiler_lib::ast::Literal::*;
         match expr {
             ast::Expr::BinOp(binop) => {
-                use ast::Literal::*;
-                use ast::Op::*;
-                let lhs = self.compile_expression(binop.lhs.0);
-                let rhs = self.compile_expression(binop.rhs.0);
+                use compiler_lib::ast::Op::*;
+                let lhs = self.compile_expression(*binop.lhs);
+                let rhs = self.compile_expression(*binop.rhs);
                 match (binop.op_type.0, binop.op) {
                     (None, Eq) => format!("Value::bool(({lhs}) == ({rhs}))"),
                     (None, Neq) => format!("Value::bool(({lhs}) != ({rhs}))"),
@@ -185,14 +182,14 @@ impl<'a> CompilationContext<'a> {
                 for stmt in block.statements {
                     out += &self.compile_statement(stmt);
                 }
-                out += &self.compile_expression(block.expr.0);
+                out += &self.compile_expression(*block.expr);
                 out += "\n}";
                 out
             }
 
             ast::Expr::Call(call) => {
-                let f = self.compile_expression(call.func.0);
-                let arg = self.compile_expression(call.arg.0);
+                let f = self.compile_expression(*call.func);
+                let arg = self.compile_expression(*call.arg);
                 if call.eval_arg_first {
                     format!("{{let _arg = {{ {arg} }}; ({f})(_arg)}}")
                 } else {
@@ -201,25 +198,25 @@ impl<'a> CompilationContext<'a> {
             }
 
             ast::Expr::Case(case) => {
-                self.tags.insert(self.strings.resolve(&case.tag.0).to_string());
-                let inner = self.compile_expression(case.expr.0);
-                format!("Value::case(_Tag::{}, {})", self.strings.resolve(&case.tag.0), inner)
+                self.tags.insert(self.strings.resolve(&case.tag).to_string());
+                let inner = self.compile_expression(*case.expr);
+                format!("Value::case(_Tag::{}, {})", self.strings.resolve(&case.tag), inner)
             }
 
             ast::Expr::FieldAccess(field_access) => {
-                self.fields.insert(self.strings.resolve(&field_access.field.0).to_string());
-                let obj = self.compile_expression(field_access.expr.0);
-                format!("({}).get_field(_Field::{})", obj, self.strings.resolve(&field_access.field.0))
+                self.fields.insert(self.strings.resolve(&field_access.field).to_string());
+                let obj = self.compile_expression(*field_access.expr);
+                format!("({}).get_field(_Field::{})", obj, self.strings.resolve(&field_access.field))
             }
 
             ast::Expr::FieldSet(field_access) => {
-                self.fields.insert(self.strings.resolve(&field_access.field.0).to_string());
-                let obj = self.compile_expression(field_access.expr.0);
-                let val = self.compile_expression(field_access.value.0);
+                self.fields.insert(self.strings.resolve(&field_access.field).to_string());
+                let obj = self.compile_expression(*field_access.expr);
+                let val = self.compile_expression(*field_access.value);
                 format!(
                     "({}).set_field(_Field::{}, {})",
                     obj,
-                    self.strings.resolve(&field_access.field.0),
+                    self.strings.resolve(&field_access.field),
                     val
                 )
             }
@@ -233,8 +230,8 @@ impl<'a> CompilationContext<'a> {
                     unreachable!()
                 };
 
-                let pat = self.compile_pattern_assignment(fndef.param.0, "arg".to_string());
-                let body = self.compile_expression(fndef.body.0);
+                let pat = self.compile_pattern_assignment(fndef.param, "arg".to_string());
+                let body = self.compile_expression(*fndef.body);
                 let cls = cls_vars
                     .into_iter()
                     .map(|v| format!("let {x} = {x}.clone();", x = self.strings.resolve(&v)))
@@ -244,20 +241,13 @@ impl<'a> CompilationContext<'a> {
             }
 
             ast::Expr::If(if_) => {
-                let cond = self.compile_expression(if_.cond.0.0);
-                let then_ = self.compile_expression(if_.then_expr.0);
-                let else_ = self.compile_expression(if_.else_expr.0);
+                let cond = self.compile_expression(*if_.cond);
+                let then_ = self.compile_expression(*if_.then_expr);
+                let else_ = self.compile_expression(*if_.else_expr);
                 format!("if ({cond}).as_bool() {{ {then_} }} else {{ {else_} }}")
             }
 
-            ast::Expr::InstantiateExist(iex) => self.compile_expression(iex.expr.0),
-
-            ast::Expr::InstantiateUni(iux) => self.compile_expression(iux.expr.0),
-
-            ast::Expr::Literal(ast::expr::LiteralExpr {
-                lit_type,
-                value: (value, _),
-            }) => match lit_type {
+            ast::Expr::Literal(ast::LiteralExpr { lit_type, value }) => match lit_type {
                 Bool => format!("Value::bool({})", value),
                 Int => format!("Value::int_literal({})", value),
                 Float => format!("Value::float({})", value),
@@ -267,20 +257,20 @@ impl<'a> CompilationContext<'a> {
             ast::Expr::Loop(loop_) => {
                 self.tags.insert("Break".to_string());
                 self.tags.insert("Loop".to_string());
-                let body = self.compile_expression(loop_.body.0);
+                let body = self.compile_expression(*loop_.body);
                 format!("loop {{ if let (_Tag::Break, res) = ({body}).as_case() {{ break res.clone() }} }}")
             }
 
             ast::Expr::Match(mx) => {
-                let val = self.compile_expression(mx.expr.0.0);
+                let val = self.compile_expression(*mx.expr);
 
                 let mut wildcard_arm = None;
                 let mut tag_arms = vec![];
-                for ((pat, _), expr) in mx.cases {
+                for (pat, expr) in mx.cases {
                     match pat {
                         ast::LetPattern::Record(_) => unimplemented!(),
-                        ast::LetPattern::Var(_, _) => wildcard_arm = Some((pat, expr.0)),
-                        ast::LetPattern::Case((tag, _), inner_pat) => tag_arms.push((tag, *inner_pat, expr.0)),
+                        ast::LetPattern::Var(_) => wildcard_arm = Some((pat, expr)),
+                        ast::LetPattern::Case(tag, inner_pat) => tag_arms.push((tag, *inner_pat, expr)),
                     }
                 }
 
@@ -316,8 +306,8 @@ impl<'a> CompilationContext<'a> {
             ast::Expr::Record(rec) => {
                 let mut out = "Value::record([".to_string();
 
-                for ((fld, _), val, mutable, _) in rec.fields {
-                    let val = self.compile_expression(val.0);
+                for (fld, val, mutable) in rec.fields {
+                    let val = self.compile_expression(val);
                     let fld = self.strings.resolve(&fld);
                     self.fields.insert(fld.to_string());
                     out += &format!("(_Field::{fld}, {val}, {mutable}),");
@@ -327,12 +317,10 @@ impl<'a> CompilationContext<'a> {
                 out
             }
 
-            ast::Expr::Typed(tx) => self.compile_expression(tx.expr.0),
-
             ast::Expr::Variable(var) => format!("{}.clone()", self.strings.resolve(&var.name)),
 
-            ast::Expr::Array(_, _) => "todo!()".to_string(),
-            ast::Expr::Dict(_, _) => "todo!()".to_string(),
+            ast::Expr::Array(_) => "todo!()".to_string(),
+            ast::Expr::Dict(_) => "todo!()".to_string(),
         }
     }
 }

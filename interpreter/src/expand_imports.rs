@@ -57,7 +57,7 @@ impl<'a> ImportExpansion<'a> {
 
                     // use a valid rust identifier
                     let module_private_name = self.strings.get_or_intern(
-                        &format!("{}", path.display())
+                        &format!("__{}", path.display())
                             .replace("/", "_")
                             .replace("-", "_")
                             .replace(".", "_"),

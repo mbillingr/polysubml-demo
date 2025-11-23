@@ -1,6 +1,7 @@
+use crate::runtime_ast as ast;
 use crate::value::Value;
+use compiler_lib::Rodeo;
 use compiler_lib::ast::StringId;
-use compiler_lib::{Rodeo, ast};
 use std::rc::Rc;
 
 pub struct CompilationContext<'a> {
@@ -21,18 +22,16 @@ impl<'a> CompilationContext<'a> {
         match stmt {
             ast::Statement::Empty => vec![],
 
-            ast::Statement::Expr((expr, _)) => append(self.compile_expression(expr), Op::Drop),
+            ast::Statement::Expr(expr) => append(self.compile_expression(expr), Op::Drop),
 
-            ast::Statement::LetDef((pat, expr)) => {
-                extend(self.compile_expression(expr.0), self.compile_pattern_assignment(pat))
-            }
+            ast::Statement::LetDef(pat, expr) => extend(self.compile_expression(expr), self.compile_pattern_assignment(pat)),
 
             ast::Statement::LetRecDef(defs) => {
                 let mut ops = vec![];
                 for (name, _) in &defs {
                     ops.push(Op::BindPlaceholder(*name));
                 }
-                for (name, (expr, _)) in defs {
+                for (name, expr) in defs {
                     let val = self.compile_expression(expr);
                     ops = extend(ops, val);
                     ops.push(Op::InitializePlaceholder(name));
@@ -43,29 +42,26 @@ impl<'a> CompilationContext<'a> {
             ast::Statement::Println(exprs) => {
                 let n = exprs.len();
                 let mut ops = vec![];
-                for (x, _) in exprs {
+                for x in exprs {
                     ops.extend(self.compile_expression(x));
                 }
                 ops.push(Op::Println(n));
                 ops
             }
-
-            ast::Statement::Import(_) => unimplemented!(),
-            ast::Statement::TypeDef(_) => unimplemented!(),
         }
     }
 
     fn compile_pattern_assignment(&mut self, pat: ast::LetPattern) -> Vec<Op> {
         match pat {
-            ast::LetPattern::Var((None, _), _) => vec![Op::Drop],
+            ast::LetPattern::Var(None) => vec![Op::Drop],
 
-            ast::LetPattern::Var((Some(var), _), _) => vec![Op::BindVar(var)],
+            ast::LetPattern::Var(Some(var)) => vec![Op::BindVar(var)],
 
             ast::LetPattern::Case(_, inner_pat) => extend(vec![Op::UnwrapCase], self.compile_pattern_assignment(*inner_pat)),
 
-            ast::LetPattern::Record(((_, field_patterns), _)) => {
+            ast::LetPattern::Record(field_patterns) => {
                 let mut ops = vec![];
-                for (i, ((field, _), inner_pat)) in field_patterns.into_iter().enumerate().rev() {
+                for (i, (field, inner_pat)) in field_patterns.into_iter().enumerate().rev() {
                     if i > 0 {
                         // copy the record if not the last field
                         ops.push(Op::Dup);
@@ -79,11 +75,11 @@ impl<'a> CompilationContext<'a> {
     }
 
     fn compile_expression(&mut self, expr: ast::Expr) -> Vec<Op> {
-        use ast::Literal::*;
+        use compiler_lib::ast::Literal::*;
         match expr {
             ast::Expr::BinOp(binop) => {
-                let ops = self.compile_expression(binop.lhs.0);
-                let ops = extend(ops, self.compile_expression(binop.rhs.0));
+                let ops = self.compile_expression(*binop.lhs);
+                let ops = extend(ops, self.compile_expression(*binop.rhs));
 
                 match (binop.op, binop.op_type) {
                     (op, (Some(Int), _)) => append(ops, Op::IntOp(op)),
@@ -99,15 +95,15 @@ impl<'a> CompilationContext<'a> {
                 for stmt in block.statements {
                     ops = extend(ops, self.compile_statement(stmt));
                 }
-                ops = extend(ops, self.compile_expression(block.expr.0));
+                ops = extend(ops, self.compile_expression(*block.expr));
                 ops = append(ops, Op::Swap);
                 ops = append(ops, Op::PopEnv);
                 ops
             }
 
             ast::Expr::Call(call) => {
-                let f = self.compile_expression(call.func.0);
-                let args = self.compile_expression(call.arg.0);
+                let f = self.compile_expression(*call.func);
+                let args = self.compile_expression(*call.arg);
                 let ops = if call.eval_arg_first {
                     append(extend(args, f), Op::Swap)
                 } else {
@@ -117,26 +113,26 @@ impl<'a> CompilationContext<'a> {
             }
 
             ast::Expr::Case(case) => {
-                let inner = self.compile_expression(case.expr.0);
-                append(inner, Op::MakeCase(case.tag.0))
+                let inner = self.compile_expression(*case.expr);
+                append(inner, Op::MakeCase(case.tag))
             }
 
             ast::Expr::FieldAccess(field_access) => {
-                let inner = self.compile_expression(field_access.expr.0);
-                append(inner, Op::GetField(field_access.field.0))
+                let inner = self.compile_expression(*field_access.expr);
+                append(inner, Op::GetField(field_access.field))
             }
 
             ast::Expr::FieldSet(field_access) => {
-                let ops = self.compile_expression(field_access.expr.0);
-                let val = self.compile_expression(field_access.value.0);
-                append(extend(ops, val), Op::SetField(field_access.field.0))
+                let ops = self.compile_expression(*field_access.expr);
+                let val = self.compile_expression(*field_access.value);
+                append(extend(ops, val), Op::SetField(field_access.field))
             }
 
             ast::Expr::FuncDef(fndef) => {
                 let body = append(
                     extend(
-                        self.compile_pattern_assignment(fndef.param.0),
-                        self.compile_expression(fndef.body.0),
+                        self.compile_pattern_assignment(fndef.param),
+                        self.compile_expression(*fndef.body),
                     ),
                     Op::Return,
                 );
@@ -144,9 +140,9 @@ impl<'a> CompilationContext<'a> {
             }
 
             ast::Expr::If(if_) => {
-                let cond = self.compile_expression(if_.cond.0.0);
-                let then_ = self.compile_expression(if_.then_expr.0);
-                let else_ = self.compile_expression(if_.else_expr.0);
+                let cond = self.compile_expression(*if_.cond);
+                let then_ = self.compile_expression(*if_.then_expr);
+                let else_ = self.compile_expression(*if_.else_expr);
                 let else_len = else_.len() as isize;
                 let then_ = append(then_, Op::Jump(else_len));
                 let then_len = then_.len() as isize;
@@ -154,21 +150,17 @@ impl<'a> CompilationContext<'a> {
                 extend(extend(ops, then_), else_)
             }
 
-            ast::Expr::InstantiateExist(iex) => self.compile_expression(iex.expr.0),
-
-            ast::Expr::InstantiateUni(iux) => self.compile_expression(iux.expr.0),
-
-            ast::Expr::Literal(ast::expr::LiteralExpr { lit_type, value }) => {
+            ast::Expr::Literal(ast::LiteralExpr { lit_type, value }) => {
                 vec![Op::PushConstant(match lit_type {
-                    Bool => Value::bool(value.0.parse().unwrap()),
-                    Int => Value::int(value.0.parse().unwrap()),
-                    Float => Value::float(value.0.parse().unwrap()),
-                    Str => Value::str(&value.0.strip_prefix('"').unwrap().strip_suffix('"').unwrap()),
+                    Bool => Value::bool(value.parse().unwrap()),
+                    Int => Value::int(value.parse().unwrap()),
+                    Float => Value::float(value.parse().unwrap()),
+                    Str => Value::str(&value.strip_prefix('"').unwrap().strip_suffix('"').unwrap()),
                 })]
             }
 
             ast::Expr::Loop(loop_) => {
-                let body_ops = self.compile_expression(loop_.body.0);
+                let body_ops = self.compile_expression(*loop_.body);
                 let offset = 1 + body_ops.len() as isize;
                 let cont = self.strings.get_or_intern_static("Continue");
                 let ops = append(body_ops, Op::JumpAndPopWhenTag(cont, -offset));
@@ -177,15 +169,15 @@ impl<'a> CompilationContext<'a> {
             }
 
             ast::Expr::Match(mx) => {
-                let ops = self.compile_expression(mx.expr.0.0);
+                let ops = self.compile_expression(*mx.expr);
 
                 let mut wildcard_arm = None;
                 let mut tag_arms = vec![];
-                for ((pat, _), expr) in mx.cases {
+                for (pat, expr) in mx.cases {
                     match pat {
                         ast::LetPattern::Record(_) => unimplemented!(),
-                        ast::LetPattern::Var(_, _) => wildcard_arm = Some((pat, expr.0)),
-                        ast::LetPattern::Case((tag, _), inner_pat) => tag_arms.push((tag, *inner_pat, expr.0)),
+                        ast::LetPattern::Var(_) => wildcard_arm = Some((pat, expr)),
+                        ast::LetPattern::Case(tag, inner_pat) => tag_arms.push((tag, *inner_pat, expr)),
                     }
                 }
 
@@ -216,32 +208,30 @@ impl<'a> CompilationContext<'a> {
             ast::Expr::Record(rec) => {
                 let mut ops = vec![];
                 let mut fields = Vec::with_capacity(rec.fields.len());
-                for ((fld, _), val, is_mut, _) in rec.fields {
+                for (fld, val, is_mut) in rec.fields {
                     fields.push((fld, is_mut));
-                    ops = extend(ops, self.compile_expression(val.0));
+                    ops = extend(ops, self.compile_expression(val));
                 }
                 ops.push(Op::MakeRecord(fields));
                 ops
             }
 
-            ast::Expr::Typed(tx) => self.compile_expression(tx.expr.0),
-
             ast::Expr::Variable(var) => vec![Op::PushVar(var.name)],
 
-            ast::Expr::Array(_, items) => {
+            ast::Expr::Array(items) => {
                 let n = items.len();
                 let mut ops = vec![];
                 for item in items {
-                    ops = extend(ops, self.compile_expression(item.0));
+                    ops = extend(ops, self.compile_expression(item));
                 }
                 ops.push(Op::MakeVector(n));
                 ops
             }
 
-            ast::Expr::Dict(_, items) => {
+            ast::Expr::Dict(items) => {
                 let n = items.len();
                 let mut ops = vec![];
-                for ((key, _), (val, _)) in items {
+                for (key, val) in items {
                     ops = extend(ops, self.compile_expression(key));
                     ops = extend(ops, self.compile_expression(val));
                 }

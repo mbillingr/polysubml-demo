@@ -1,9 +1,10 @@
 use crate::ast_processor::AstProcessor;
 use crate::builtins;
+use crate::runtime_ast as ast;
 use crate::value::{Builtin, Func};
 use crate::value::{ImHashMap, Value};
+use compiler_lib::Rodeo;
 use compiler_lib::ast::StringId;
-use compiler_lib::{Rodeo, ast};
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::sync::Arc;
@@ -47,10 +48,10 @@ impl<'a> Context<'a> {
         match stmt {
             ast::Statement::Empty => {}
             ast::Statement::Expr(expr) => {
-                self.eval(&expr.0);
+                self.eval(&expr);
             }
-            ast::Statement::LetDef((pat, expr)) => {
-                let val = self.eval(&expr.0);
+            ast::Statement::LetDef(pat, expr) => {
+                let val = self.eval(&expr);
                 assign(pat, Cow::Owned(val), &mut self.state.env);
             }
             ast::Statement::LetRecDef(defs) => {
@@ -59,28 +60,26 @@ impl<'a> Context<'a> {
                 }
 
                 for (name, expr) in defs {
-                    let val = self.eval(&expr.0);
+                    let val = self.eval(&expr);
                     self.state.env.set_placeholder(*name, val);
                 }
             }
             ast::Statement::Println(exprs) => {
                 for x in exprs {
-                    print!("{} ", self.eval(&x.0).show(self.strings));
+                    print!("{} ", self.eval(&x).show(self.strings));
                 }
                 println!()
             }
-            ast::Statement::Import(_) => unimplemented!(),
-            ast::Statement::TypeDef(_) => unimplemented!(),
         }
     }
 
     pub fn eval(&mut self, expr: &ast::Expr) -> Value {
         match expr {
             ast::Expr::BinOp(bop) => {
-                use ast::Literal::*;
-                use ast::Op::*;
-                let lhs = self.eval(&bop.lhs.0);
-                let rhs = self.eval(&bop.rhs.0);
+                use compiler_lib::ast::Literal::*;
+                use compiler_lib::ast::Op::*;
+                let lhs = self.eval(&bop.lhs);
+                let rhs = self.eval(&bop.rhs);
                 match (&bop.op_type.0, &bop.op) {
                     (None, Eq) => Value::bool(lhs == rhs),
                     (None, Neq) => Value::bool(lhs != rhs),
@@ -114,7 +113,7 @@ impl<'a> Context<'a> {
                     self.exec(stmt);
                 }
 
-                let result = self.eval(&block.expr.0);
+                let result = self.eval(&block.expr);
 
                 self.state.env = outer_env;
 
@@ -125,11 +124,11 @@ impl<'a> Context<'a> {
                 let func;
                 let arg;
                 if call.eval_arg_first {
-                    arg = self.eval(&call.arg.0);
-                    func = self.eval(&call.func.0);
+                    arg = self.eval(&call.arg);
+                    func = self.eval(&call.func);
                 } else {
-                    func = self.eval(&call.func.0);
-                    arg = self.eval(&call.arg.0);
+                    func = self.eval(&call.func);
+                    arg = self.eval(&call.arg);
                 }
                 match func.as_func() {
                     Func::Func(pat, body, cls) => {
@@ -145,45 +144,43 @@ impl<'a> Context<'a> {
                 }
             }
 
-            ast::Expr::Case(case) => Value::case(case.tag.0, self.eval(&case.expr.0)),
+            ast::Expr::Case(case) => Value::case(case.tag, self.eval(&case.expr)),
 
             ast::Expr::FieldAccess(fa) => {
-                let obj = self.eval(&fa.expr.0);
-                obj.get_field(fa.field.0)
+                let obj = self.eval(&fa.expr);
+                obj.get_field(fa.field)
             }
 
             ast::Expr::FieldSet(fs) => {
-                let obj = self.eval(&fs.expr.0);
-                let val = self.eval(&fs.value.0);
-                obj.set_field(fs.field.0, val)
+                let obj = self.eval(&fs.expr);
+                let val = self.eval(&fs.value);
+                obj.set_field(fs.field, val)
             }
 
-            ast::Expr::FuncDef(def) => Value::func(def.param.0.clone(), def.body.0.clone(), self.state.env.clone()),
+            ast::Expr::FuncDef(def) => Value::func(def.param.clone(), (*def.body).clone(), self.state.env.clone()),
 
             ast::Expr::If(ifexp) => {
-                let cond = self.eval(&ifexp.cond.0.0);
+                let cond = self.eval(&ifexp.cond);
                 if cond.as_bool() {
-                    self.eval(&ifexp.then_expr.0)
+                    self.eval(&ifexp.then_expr)
                 } else {
-                    self.eval(&ifexp.else_expr.0)
+                    self.eval(&ifexp.else_expr)
                 }
             }
 
-            ast::Expr::InstantiateExist(iex) => self.eval(&iex.expr.0),
-
-            ast::Expr::InstantiateUni(iun) => self.eval(&iun.expr.0),
-
             ast::Expr::Literal(lit) => match lit.lit_type {
-                ast::Literal::Bool => Value::bool(lit.value.0.parse().unwrap()),
-                ast::Literal::Int => Value::int(lit.value.0.parse().unwrap()),
-                ast::Literal::Float => Value::float(lit.value.0.parse().unwrap()),
-                ast::Literal::Str => Value::str(&lit.value.0.strip_prefix('"').unwrap().strip_suffix('"').unwrap()),
+                compiler_lib::ast::Literal::Bool => Value::bool(lit.value.parse().unwrap()),
+                compiler_lib::ast::Literal::Int => Value::int(lit.value.parse().unwrap()),
+                compiler_lib::ast::Literal::Float => Value::float(lit.value.parse().unwrap()),
+                compiler_lib::ast::Literal::Str => {
+                    Value::str(&lit.value.strip_prefix('"').unwrap().strip_suffix('"').unwrap())
+                }
             },
 
             ast::Expr::Loop(lx) => {
                 let brk = self.strings.get_or_intern_static("Break");
                 loop {
-                    let res = self.eval(&lx.body.0);
+                    let res = self.eval(&lx.body);
                     let (tag, val) = res.as_case();
                     if tag == brk {
                         return val.clone();
@@ -192,11 +189,11 @@ impl<'a> Context<'a> {
             }
 
             ast::Expr::Match(mx) => {
-                let val = self.eval(&mx.expr.0.0);
+                let val = self.eval(&mx.expr);
                 for (pat, arm) in &mx.cases {
-                    if let Some(env) = match_pattern(&pat.0, Cow::Borrowed(&val), &self.state.env) {
+                    if let Some(env) = match_pattern(&pat, Cow::Borrowed(&val), &self.state.env) {
                         let old_env = std::mem::replace(&mut self.state.env, env);
-                        let result = self.eval(&arm.0);
+                        let result = self.eval(&arm);
                         self.state.env = old_env;
                         return result;
                     }
@@ -204,20 +201,16 @@ impl<'a> Context<'a> {
                 unimplemented!()
             }
 
-            ast::Expr::Record(rec) => {
-                Value::record(rec.fields.iter().map(|field| (field.0.0, self.eval(&field.1.0), field.2)))
-            }
-
-            ast::Expr::Typed(tx) => self.eval(&tx.expr.0),
+            ast::Expr::Record(rec) => Value::record(rec.fields.iter().map(|field| (field.0, self.eval(&field.1), field.2))),
 
             ast::Expr::Variable(var) => self.state.env.lookup(var.name).unwrap(),
 
-            ast::Expr::Array(_, items) => Value::vect(items.iter().map(|item| self.eval(&item.0)).collect::<Vec<_>>()),
+            ast::Expr::Array(items) => Value::vect(items.iter().map(|item| self.eval(&item)).collect::<Vec<_>>()),
 
-            ast::Expr::Dict(_, items) => Value::dict(
+            ast::Expr::Dict(items) => Value::dict(
                 items
                     .iter()
-                    .map(|item| (self.eval(&item.0.0), self.eval(&item.1.0)))
+                    .map(|item| (self.eval(&item.0), self.eval(&item.1)))
                     .collect::<ImHashMap<_, _>>(),
             ),
         }
@@ -226,20 +219,20 @@ impl<'a> Context<'a> {
 
 fn match_pattern(pat: &ast::LetPattern, val: Cow<Value>, env: &Env) -> Option<Env> {
     match pat {
-        ast::LetPattern::Var((None, _), _) => Some(env.clone()),
-        ast::LetPattern::Var((Some(var), _), _) => Some(env.bind(*var, val.into_owned())),
+        ast::LetPattern::Var(None) => Some(env.clone()),
+        ast::LetPattern::Var(Some(var)) => Some(env.bind(*var, val.into_owned())),
 
         ast::LetPattern::Case(tag, inner_pat) => {
             let (actual_tag, inner_val) = val.as_case();
-            if tag.0 != actual_tag {
+            if *tag != actual_tag {
                 return None;
             }
             match_pattern(&**inner_pat, Cow::Borrowed(inner_val), env)
         }
 
-        ast::LetPattern::Record(((_, field_patterns), _)) => {
+        ast::LetPattern::Record(field_patterns) => {
             let mut env_ = env.clone();
-            for ((field, _), inner_pat) in field_patterns {
+            for (field, inner_pat) in field_patterns {
                 env_ = match_pattern(&*inner_pat, Cow::Owned(val.get_field(*field)), &env_)?;
             }
             Some(env_)
@@ -249,19 +242,19 @@ fn match_pattern(pat: &ast::LetPattern, val: Cow<Value>, env: &Env) -> Option<En
 
 fn assign(pat: &ast::LetPattern, val: Cow<Value>, env: &mut Env) {
     match pat {
-        ast::LetPattern::Var((None, _), _) => {}
-        ast::LetPattern::Var((Some(var), _), _) => {
+        ast::LetPattern::Var(None) => {}
+        ast::LetPattern::Var(Some(var)) => {
             let bnd = env.bind(*var, val.into_owned());
             *env = bnd;
         }
 
-        ast::LetPattern::Case((_, _), inner_pat) => {
+        ast::LetPattern::Case(_, inner_pat) => {
             let (_, inner_val) = val.as_case();
             assign(&**inner_pat, Cow::Borrowed(inner_val), env)
         }
 
-        ast::LetPattern::Record(((_, field_patterns), _)) => {
-            for ((field, _), inner_pat) in field_patterns {
+        ast::LetPattern::Record(field_patterns) => {
+            for (field, inner_pat) in field_patterns {
                 assign(&*inner_pat, Cow::Owned(val.get_field(*field)), env);
             }
         }
