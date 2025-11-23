@@ -2,10 +2,10 @@ This is a fork of PolySubML that adds the following features:
 
 * An ad-hoc interpreter written in Rust. This is likely less efficient than compilation to Javascript,
   but makes it easier for me to add new runtime-related features:
-    * Builtin functions for reading from stdin (partially done)
+    * Builtin functions for reading from stdin
     * Builtin functions for writing to stdout (partially done)
-    * Builtin functions for string manipulation (partially done)
-    * Builtin functions for number conversion (partially done)
+    * Builtin functions for string manipulation
+    * Builtin functions for number conversion
   (I also added compilation to Rust, but this is not much faster than the interpreter; at least with
   the current naive Value representation)
 * Some features are added as new AST nodes that need to be transformed into core language AST nodes.
