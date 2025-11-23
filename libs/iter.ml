@@ -40,6 +40,18 @@ let rec range = fun (start: int, stop: int): (<<iter int>>) ->
                 | `Some x -> `Some f x
                 | none -> none
 
+    and map_0 = fun (type a b c) (f: a -> b, it: <<iter (a*c)>>): (<<iter (b*c)>>) ->
+        fun _ ->
+            match it {} with
+                | `Some (x, y) -> `Some ((f x), y)
+                | none -> none
+
+    and map_1 = fun (type a b c) (f: a -> b, it: <<iter (c*a)>>): (<<iter (c*b)>>) ->
+        fun _ ->
+            match it {} with
+                | `Some (x, y) -> `Some (x, (f y))
+                | none -> none
+
     and filter = fun (type a) (f: a -> bool, it: <<iter a>>): (<<iter a>>) ->
         fun z ->
             loop
@@ -49,6 +61,12 @@ let rec range = fun (start: int, stop: int): (<<iter int>>) ->
                         else
                             `Continue z)
                     | none -> `Break none
+
+    and filter_0 = fun (type a b) (f: a -> bool, it: <<iter (a*b)>>): (<<iter (a*b)>>) ->
+        filter((fun(x,_)->f x), it)
+
+    and filter_1 = fun (type a b) (f: b -> bool, it: <<iter (a*b)>>): (<<iter (a*b)>>) ->
+        filter((fun(_,y)->f y), it)
 
     and skip = fun (type a) (n: int, it: <<iter a>>) : (<<iter a>>) ->
         let state = {mut action=it; mut k=n} in
@@ -81,6 +99,16 @@ let rec range = fun (start: int, stop: int): (<<iter int>>) ->
                     | none -> none)
                 | none -> none
 
+    and chain = fun (type a) (ia: <<iter a>>, ib: <<iter a>>) : (<<iter a>>) ->
+        let state = {mut it=ia; mut next=`Some ib}
+        in fun _ ->
+            match state.it {} with
+                | `None _ -> (match state.next with
+                    | `Some it -> (state.it <- it; it {})
+                    | none -> none)
+                | some -> some
+
+
 in {
-    filter; fold; fold2; for_each; map; range; skip; take; zip
+    chain; filter; filter_0; filter_1; fold; fold2; for_each; map; map_0; map_1; range; skip; take; zip
 }

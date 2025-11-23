@@ -80,10 +80,13 @@ let rec is_empty = fun xs -> (length xs) == 0
               | other -> other
         )
 
-    and sort = fun (type a) (cmp : ((a*a)->bool), xs : vec@a) : (vec@a) ->
+    and sort_by = fun (type a) (cmp : ((a*a)->bool), xs : vec@a) : (vec@a) ->
         if length xs < 2 then xs else
         let (lhs, rhs) = split(xs, (__vec_length xs) / 2) in
-            merge_sorted(cmp, sort(cmp, lhs), sort(cmp, rhs))
+            merge_sorted(cmp, sort_by(cmp, lhs), sort_by(cmp, rhs))
+
+    and sort_int = fun (xs : vec@int) : (vec@int) ->
+        sort_by((fun(a,b)->a<b), xs)
 
     and collect_rev = fun (type a) (it: <<iter a>>) : (vec@a) ->
         iterator.fold(push_front[a=a], empty, it)
@@ -93,6 +96,7 @@ let rec is_empty = fun xs -> (length xs) == 0
 ;
 
 {
-    append; back; collect; collect_rev; empty; filter; foldl; foldr; front; get; is_empty; iter; iter_rev; length; map;
-    merge_sorted; peek; peek_back; peek_front; pop_back; pop_front; push_back; push_front; reverse; sort; split
+    append; back; collect; collect_rev; empty; filter; foldl; foldr; front; get; is_empty; iter;
+    iter_rev; length; map; merge_sorted; peek; peek_back; peek_front; pop_back; pop_front; push_back;
+    push_front; reverse; sort_by; sort_int; split
 }
