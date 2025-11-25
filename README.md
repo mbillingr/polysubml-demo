@@ -11,6 +11,7 @@ This is a fork of PolySubML that adds the following features:
 * Some features are added as new AST nodes that need to be transformed into core language AST nodes.
     * Module system
     * Module-wide type definitions
+    * Syntax for empty tuples (to make calling functions without args more natural)
 * A few features require extending the core typechecker
     * Arrays/Vectors
     * Dictionaries

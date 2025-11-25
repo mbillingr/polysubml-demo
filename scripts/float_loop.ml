@@ -8,9 +8,9 @@ let vars = {mut x=0.5; mut n=10000000};
 
 loop
     if (vars.n <- vars.n - 1) <= 0 then
-        `Break 0
+        `Break ()
     else (
         vars.x <- r *. vars.x *. (1.0 -. vars.x);
-        `Continue 0);
+        `Continue ());
 
 print vars.x

@@ -21,7 +21,7 @@ let fold = fun (type a b) (f: (b*a)->b, init: b, it: <<iter a>>) : b ->
                 | `Some x -> `Continue (vars.acc <- f(vars.acc, x));
 
 // same as fold but function arguments swapped
-let fold2 = fun (type a b) (f: (a*b)->b, init: b, it: <<iter a>>) : b ->
+let foldswap = fun (type a b) (f: (a*b)->b, init: b, it: <<iter a>>) : b ->
     let vars = {mut acc=init} in
         loop
             match it {} with
@@ -110,5 +110,5 @@ let chain = fun (type a) (ia: <<iter a>>, ib: <<iter a>>) : (<<iter a>>) ->
 
 
 {
-    chain; filter; filter_0; filter_1; fold; fold2; for_each; map; map_0; map_1; range; skip; take; zip
+    chain; filter; filter_0; filter_1; fold; foldswap; for_each; map; map_0; map_1; range; skip; take; zip
 }

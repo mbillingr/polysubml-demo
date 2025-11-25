@@ -11,25 +11,24 @@ let filter = vec.filter;
 let append = vec.append;
 let reverse = vec.reverse;
 let merge_sorted = vec.merge_sorted;
-let sort = vec.sort;
+let sort_by = vec.sort_by;
 let collect = vec.collect;
 let collect_rev = vec.collect_rev;
 let iter = vec.iter;
 
-let rec cons = fun (type a) (hd:a, tl:(<<list a>>)) : (<<list a>>) ->
-      __vec_push_front(tl, hd)
+let cons = fun (type a) (hd:a, tl:(<<list a>>)) : (<<list a>>) ->
+      __vec_push_front(tl, hd);
 
-    and head = fun (type a) (lst : (<<list a>>)) : a ->
-      match __vec_peek_front lst with
-        | `None _ -> panic "empty list"
-        | `Some h -> h
+let head = fun (type a) (lst : (<<list a>>)) : a ->
+  match __vec_peek_front lst with
+    | `None _ -> panic "empty list"
+    | `Some h -> h;
 
-    and tail = fun (type a) (lst : (<<list a>>)) : (<<list a>>) ->
-      if is_empty lst
-      then panic "empty list"
-      else __vec_pop_front lst
-;
+let tail = fun (type a) (lst : (<<list a>>)) : (<<list a>>) ->
+  if is_empty lst
+  then panic "empty list"
+  else __vec_pop_front lst;
 
 {
-  nil; is_empty; cons; head; foldl; foldr; map; filter; append; reverse; sort; merge_sorted; collect_rev; collect; iter
+  nil; is_empty; cons; head; foldl; foldr; map; filter; append; reverse; sort_by; merge_sorted; collect_rev; collect; iter
 }

@@ -248,6 +248,7 @@ SimpleExpr = {
     Record,
     VarOrLiteral,
     "(" <Expr> ")",
+    "()" => ast::expr::record(vec![]),
     "#[" <SepListOpt<SSimpleExpr, ",">> "]" => ast::expr::array(ctx.strings.get_or_intern_static("vec"), <>),
     "#{" <SepListOpt<(<SSimpleExpr> ":" <SSimpleExpr>), ",">> "}" => ast::expr::dict(ctx.strings.get_or_intern_static("dict"), <>),
     "(" <Box<SExpr>> ":" <SType> ")" => ast::expr::typed(<>),

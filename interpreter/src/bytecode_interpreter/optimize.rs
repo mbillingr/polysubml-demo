@@ -1,4 +1,5 @@
 use crate::bytecode_interpreter::compiler::Op;
+use crate::value::Value;
 use std::collections::{BTreeSet, HashSet};
 use std::rc::Rc;
 
@@ -83,6 +84,12 @@ fn peephole(BasicBlock(ops): BasicBlock) -> BasicBlock {
 
         loop {
             match out.as_slice() {
+                // empty records are equivalent to the unit value
+                [.., Op::MakeRecord(fields)] if fields.is_empty() => {
+                    out.pop().unwrap();
+                    out.push(Op::PushConstant(Value::nothing()))
+                }
+
                 // if a variable is loaded twice, load it only once and duplicate the value
                 [.., Op::PushVar(a), Op::PushVar(b)] if a == b => {
                     out.pop().unwrap();
