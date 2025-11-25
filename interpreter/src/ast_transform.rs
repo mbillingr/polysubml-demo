@@ -49,10 +49,7 @@ impl AstTransWalker for ast::Expr {
                 ..boe
             }),
 
-            ast::Expr::Block(blk) => ast::Expr::Block(ast::BlockExpr {
-                statements: blk.statements.transform(visitor),
-                expr: blk.expr.transform(visitor),
-            }),
+            ast::Expr::Block(blk) => ast::block(blk.statements.transform(visitor), (*blk.expr).transform(visitor)),
 
             ast::Expr::Call(call) => ast::Expr::Call(ast::CallExpr {
                 func: call.func.transform(visitor),

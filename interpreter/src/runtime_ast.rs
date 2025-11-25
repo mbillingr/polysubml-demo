@@ -5,7 +5,7 @@ pub fn simplify(script: Vec<compiler_lib::ast::Statement>) -> Vec<Statement> {
     to_stmts(script)
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
     Empty,
     Expr(Expr),
@@ -14,14 +14,14 @@ pub enum Statement {
     Println(Vec<Expr>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum LetPattern {
     Case(StringId, Box<LetPattern>),
-    Record(Vec<(StringId, Box<LetPattern>)>),
+    Record(Vec<(StringId, LetPattern)>),
     Var(Option<StringId>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     BinOp(BinOpExpr),
     Block(BlockExpr),
@@ -40,7 +40,7 @@ pub enum Expr {
     Dict(Vec<(Expr, Expr)>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct BinOpExpr {
     pub lhs: Box<Expr>,
     pub rhs: Box<Expr>,
@@ -48,76 +48,107 @@ pub struct BinOpExpr {
     pub op: Op,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct BlockExpr {
     pub statements: Vec<Statement>,
     pub expr: Box<Expr>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CallExpr {
     pub func: Box<Expr>,
     pub arg: Box<Expr>,
     pub eval_arg_first: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CaseExpr {
     pub tag: StringId,
     pub expr: Box<Expr>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FieldAccessExpr {
     pub expr: Box<Expr>,
     pub field: StringId,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FieldSetExpr {
     pub expr: Box<Expr>,
     pub field: StringId,
     pub value: Box<Expr>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FuncDefExpr {
     pub param: LetPattern,
     pub body: Box<Expr>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct IfExpr {
     pub cond: Box<Expr>,
     pub then_expr: Box<Expr>,
     pub else_expr: Box<Expr>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct LiteralExpr {
     pub lit_type: Literal,
     pub value: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct LoopExpr {
     pub body: Box<Expr>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct MatchExpr {
     pub expr: Box<Expr>,
     pub cases: Vec<(LetPattern, Expr)>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct RecordExpr {
     pub fields: Vec<(StringId, Expr, bool)>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct VariableExpr {
     pub name: StringId,
+}
+
+pub fn block(stmts: impl IntoIterator<Item = Statement>, mut expr: Expr) -> Expr {
+    let mut stmts: Vec<_> = stmts.into_iter().filter(|stmt| !matches!(stmt, Statement::Empty)).collect();
+    if stmts.is_empty() {
+        return expr;
+    }
+
+    if let Expr::Block(blk) = expr {
+        stmts.extend(blk.statements);
+        expr = *blk.expr;
+    }
+
+    Expr::Block(BlockExpr {
+        statements: stmts,
+        expr: Box::new(expr),
+    })
+}
+
+pub fn case(tag: StringId, expr: Expr) -> Expr {
+    Expr::Case(CaseExpr {
+        tag,
+        expr: Box::new(expr),
+    })
+}
+
+pub fn field_access(field: StringId, expr: Expr) -> Expr {
+    Expr::FieldAccess(FieldAccessExpr {
+        expr: Box::new(expr),
+        field,
+    })
 }
 
 trait ToExpr {
@@ -146,10 +177,7 @@ impl ToExpr for compiler_lib::ast::Expr {
                 op: bxe.op,
             }),
 
-            compiler_lib::ast::Expr::Block(be) => Expr::Block(BlockExpr {
-                statements: to_stmts(be.statements),
-                expr: be.expr.to_expr().into(),
-            }),
+            compiler_lib::ast::Expr::Block(be) => block(to_stmts(be.statements), be.expr.to_expr()),
 
             compiler_lib::ast::Expr::Call(ce) => Expr::Call(CallExpr {
                 func: ce.func.to_expr().into(),
@@ -242,7 +270,7 @@ impl ToPattern for compiler_lib::ast::LetPattern {
         match self {
             compiler_lib::ast::LetPattern::Case((tag, _), pat) => LetPattern::Case(tag, pat.to_pat().into()),
             compiler_lib::ast::LetPattern::Record(((_, fields), _)) => {
-                LetPattern::Record(fields.into_iter().map(|((f, _), p)| (f, Box::new(p.to_pat()))).collect())
+                LetPattern::Record(fields.into_iter().map(|((f, _), p)| (f, p.to_pat())).collect())
             }
             compiler_lib::ast::LetPattern::Var((var, _), _) => LetPattern::Var(var),
         }
@@ -264,5 +292,34 @@ impl<T: ToExpr> ToExpr for Box<T> {
 impl<T: ToPattern> ToPattern for Spanned<T> {
     fn to_pat(self) -> LetPattern {
         self.0.to_pat()
+    }
+}
+
+/// Builder functions for constructing AST nodes without a source. Used for tests and such.
+#[cfg(test)]
+pub mod builder {
+    use super::*;
+    use compiler_lib::Rodeo;
+    use compiler_lib::grammar::ScriptParser;
+    use compiler_lib::spans::SpanManager;
+    use std::cell::RefCell;
+
+    thread_local! {
+        static STRINGS: RefCell<Rodeo> = RefCell::new(Rodeo::new());
+    }
+
+    pub fn stmts(src: &str) -> Vec<Statement> {
+        STRINGS.with(|s| {
+            let mut strings = s.borrow_mut();
+            let mut span_mgr = SpanManager::default();
+            let span_maker = span_mgr.add_source(src.to_owned());
+            let mut ctx = compiler_lib::ast::ParserContext {
+                span_maker,
+                strings: &mut *strings,
+            };
+            let parser = ScriptParser::new();
+            let ast = parser.parse(&mut ctx, src).unwrap();
+            simplify(ast)
+        })
     }
 }

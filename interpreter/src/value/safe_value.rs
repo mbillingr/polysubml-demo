@@ -205,7 +205,7 @@ impl Value {
     pub fn as_case(&self) -> (StringId, &Value) {
         match self {
             Value::Case(cs) => (cs.0, &cs.1),
-            _ => unimplemented!(),
+            _ => unimplemented!("{:?} is not a case", self),
         }
     }
 

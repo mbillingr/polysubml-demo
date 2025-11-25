@@ -67,7 +67,7 @@ impl<'a> CompilationContext<'a> {
                         ops.push(Op::Dup);
                     }
                     ops.push(Op::GetField(field));
-                    ops = extend(ops, self.compile_pattern_assignment(*inner_pat));
+                    ops = extend(ops, self.compile_pattern_assignment(inner_pat));
                 }
                 ops
             }

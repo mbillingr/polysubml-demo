@@ -31,8 +31,7 @@ impl AstTransformer for DirectCallTransformer {
                 ast::Expr::FuncDef(fd) => {
                     self.changes += 1;
                     let statements = vec![ast::Statement::LetDef(fd.param, *arg)];
-                    let body = fd.body;
-                    ast::Expr::Block(ast::BlockExpr { statements, expr: body })
+                    ast::block(statements, *fd.body)
                 }
                 f => ast::Expr::Call(ast::CallExpr {
                     func: Box::new(f),

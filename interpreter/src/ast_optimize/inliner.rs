@@ -18,6 +18,7 @@ enum Var {
     Variable(ast::VariableExpr),
     Literal(ast::LiteralExpr),
     Function(ast::FuncDefExpr),
+    Case(ast::CaseExpr),
     Record(ast::RecordExpr),
 }
 
@@ -57,6 +58,7 @@ impl InlineTransformer {
             ast::Expr::Variable(var) => self.lookup(&var.name).unwrap_or(Var::Variable(var.clone())),
             ast::Expr::Literal(x) => Var::Literal(x.clone()),
             ast::Expr::FuncDef(fd) => Var::Function(fd.clone()),
+            ast::Expr::Case(cx) => Var::Case(cx.clone()),
             ast::Expr::Record(rec) => Var::Record(rec.clone()),
             ast::Expr::Block(blk) => {
                 if is_pure(&blk.expr) && free_vars(&blk.expr).is_empty() {
@@ -75,6 +77,7 @@ impl InlineTransformer {
             Var::Variable(vx) => Some(ast::Expr::Variable(vx)),
             Var::Literal(lit) => Some(ast::Expr::Literal(lit)),
             Var::Function(fd) => Some(ast::Expr::FuncDef(fd)),
+            Var::Case(cx) => Some(ast::Expr::Case(cx)),
             Var::Record(rec) => Some(ast::Expr::Record(rec)),
         }
     }
@@ -89,6 +92,7 @@ impl InlineTransformer {
             Var::Variable(_) => Var::Unknown,
             Var::Literal(_) => unimplemented!(),
             Var::Function(_) => unimplemented!(),
+            Var::Case(cx) => self.resolve_exp(&cx.expr),
             Var::Record(_) => unimplemented!(),
         }
     }
@@ -98,6 +102,7 @@ impl InlineTransformer {
             Var::Variable(_) => Var::Unknown,
             Var::Literal(_) => unimplemented!(),
             Var::Function(_) => unimplemented!(),
+            Var::Case(_) => unimplemented!(),
             Var::Record(rec) => {
                 for (f, v, m) in &rec.fields {
                     if *f == field_name {
@@ -127,9 +132,9 @@ impl AstTransformer for InlineTransformer {
                     stmts.push(stmt.transform(&mut local));
                 }
 
-                let expr = blk.expr.transform(&mut local);
+                let expr = (*blk.expr).transform(&mut local);
 
-                TransformResult::Break(ast::Expr::Block(ast::BlockExpr { statements: stmts, expr }))
+                TransformResult::Break(ast::block(stmts, expr))
             }
 
             ast::Expr::Variable(ref var) => match self.inline(var.name) {

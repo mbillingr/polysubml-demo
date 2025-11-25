@@ -135,7 +135,7 @@ impl<'a> CompilationContext<'a> {
                 for (field, inner_pat) in field_patterns.into_iter().rev() {
                     self.fields.insert(self.strings.resolve(&field).to_string());
                     out += &self.compile_pattern_assignment(
-                        *inner_pat,
+                        inner_pat,
                         format!("{tmp}.get_field(_Field::{})", self.strings.resolve(&field)),
                     );
                 }

@@ -16,6 +16,7 @@ mod type_errors;
 mod typeck;
 mod unwindmap;
 
+pub use lasso;
 pub use lasso::Rodeo;
 
 use std::mem;

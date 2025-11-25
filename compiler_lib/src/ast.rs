@@ -13,7 +13,7 @@ pub struct ParserContext<'a, 'input> {
 }
 pub type StringId = lasso::Spur;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
     Bool,
     Float,

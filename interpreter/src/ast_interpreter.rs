@@ -189,16 +189,32 @@ impl<'a> Context<'a> {
             }
 
             ast::Expr::Match(mx) => {
-                let val = self.eval(&mx.expr);
+                let val0 = self.eval(&mx.expr);
+                let (tag, val) = val0.as_case();
+
+                let mut wildcard = None;
                 for (pat, arm) in &mx.cases {
-                    if let Some(env) = match_pattern(&pat, Cow::Borrowed(&val), &self.state.env) {
-                        let old_env = std::mem::replace(&mut self.state.env, env);
-                        let result = self.eval(&arm);
-                        self.state.env = old_env;
-                        return result;
+                    match pat {
+                        ast::LetPattern::Case(t, p) => {
+                            if *t != tag {
+                                continue;
+                            }
+                            let env = match_pattern(&p, Cow::Borrowed(&val), &self.state.env).unwrap();
+                            let old_env = std::mem::replace(&mut self.state.env, env);
+                            let result = self.eval(&arm);
+                            self.state.env = old_env;
+                            return result;
+                        }
+                        _ => wildcard = Some((pat, arm)),
                     }
                 }
-                unimplemented!()
+
+                let (pat, arm) = wildcard.unwrap();
+                let env = match_pattern(&pat, Cow::Owned(val0), &self.state.env).unwrap();
+                let old_env = std::mem::replace(&mut self.state.env, env);
+                let result = self.eval(&arm);
+                self.state.env = old_env;
+                result
             }
 
             ast::Expr::Record(rec) => Value::record(rec.fields.iter().map(|field| (field.0, self.eval(&field.1), field.2))),

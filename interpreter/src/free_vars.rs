@@ -3,7 +3,7 @@ use crate::runtime_ast as ast;
 use compiler_lib::ast::StringId;
 use std::collections::HashSet;
 
-pub fn free_vars(expr: &ast::Expr) -> HashSet<StringId> {
+pub fn free_vars<T: AstWalker>(expr: &T) -> HashSet<StringId> {
     let mut fvv = FreeVarsVisitor::new();
     expr.walk_ast(&mut fvv);
     fvv.fvs
@@ -57,8 +57,8 @@ impl AstVisitor for FreeVarsVisitor {
 
     fn post_visit_stmt(&mut self, stmt: &ast::Statement) {
         match stmt {
-            ast::Statement::LetDef(_pat, _) => {
-                unimplemented!()
+            ast::Statement::LetDef(_pat, expr) => {
+                expr.walk_ast(self);
             }
             ast::Statement::LetRecDef(defs) => {
                 for (bound, _) in defs {

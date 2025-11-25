@@ -60,6 +60,8 @@ impl<'a> VariableRenamer<'a> {
             return varname;
         }
 
+        let prefix = prefix.split_once("'").map(|(p, _)| p).unwrap_or(prefix);
+
         let unique_name = format!("{}'{}", prefix, self.gensym_counter);
         self.gensym_counter += 1;
         s.get_or_intern(unique_name)
@@ -76,9 +78,9 @@ impl AstTransformer for VariableRenamer<'_> {
                     stmts.push(stmt.transform(local));
                 }
 
-                let expr = blk.expr.transform(local);
+                let expr = (*blk.expr).transform(local);
 
-                TransformResult::Break(ast::Expr::Block(ast::BlockExpr { statements: stmts, expr }))
+                TransformResult::Break(ast::block(stmts, expr))
             }),
 
             ast::Expr::Variable(ref var) => TransformResult::Break(ast::Expr::Variable(ast::VariableExpr {
