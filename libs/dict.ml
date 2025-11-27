@@ -10,6 +10,11 @@ let remove = __dict_remove;
 let get = __dict_get;
 let items = __dict_iter;
 
+let get_or = fun (type k v) (d: (dict@k*v), key: k, default: v) : v ->
+    match get(d, key) with
+        | `Some v -> v
+        | `None _ -> default;
+
 let insert_pair = fun (type k v) (d: (dict@k*v), (x:k, y:v)) : (dict@k*v) ->
     insert(d, x, y);
 
@@ -47,9 +52,17 @@ let xor = fun (type k v) (d1: (dict@k*v), d2: (dict@k*v)) : (dict@k*v) ->
         iter.filter_0((fun k -> not contains(d2, k)), items d1),
         iter.filter_0((fun k -> not contains(d1, k)), items d2));
 
+let count = fun (type k) (it: <<iter k>>): (dict@k*int) ->
+    iter.fold(
+        (fun (counts, x) ->
+            let c = get_or(counts, x, 0) in
+            insert(counts, x, c + 1)),
+        empty,
+        it);
+
 let symmetric_difference = xor;
 
 {
-    collect; contains; difference; empty; get; insert; insert_pair; intersection; items; keys; length;
+    collect; contains; count; difference; empty; get; get_or; insert; insert_pair; intersection; items; keys; length;
     map_keys; map_vals; remove; symmetric_difference; union; vals; xor
 }

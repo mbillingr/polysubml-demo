@@ -94,8 +94,15 @@ let collect_rev = fun (type a) (it: <<iter a>>) : (vec@a) ->
 let collect = fun (type a) (it: <<iter a>>) : (vec@a) ->
     iterator.fold(push_back[a=a], empty, it);
 
+let remove_at = fun (type a) (xs: (vec@a), i: int) : (vec@a) -> begin
+  let ixs = iterator.enumerate(iter xs);
+  let ixs_ = iterator.filter((fun (j, _) -> j != i), ixs);
+  let xs_ = iterator.map((fun (_, x) -> x), ixs_);
+  collect(xs_)
+end;
+
 {
     append; back; collect; collect_rev; empty; filter; foldl; foldr; front; get; is_empty; iter;
     iter_rev; length; map; merge_sorted; peek; peek_back; peek_front; pop_back; pop_front; push_back;
-    push_front; reverse; sort_by; sort_int; split
+    push_front; remove_at; reverse; sort_by; sort_int; split
 }

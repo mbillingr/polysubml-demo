@@ -1,5 +1,5 @@
 import "libs/io.ml";
-import "libs/num.ml";
+import "libs/int.ml";
 import "libs/option.ml";
 
 
@@ -10,6 +10,6 @@ let rec fibonacci = fun (n: int): int ->
         fibonacci(n - 1) + fibonacci(n - 2);
 
 
-let n = option.unwrap num.s2i io.read_expected_line();
+let n = option.unwrap int.from_str io.read_expected_line();
 let f = fibonacci(n);
 print f

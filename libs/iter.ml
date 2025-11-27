@@ -13,6 +13,10 @@ let range = fun (start: int, stop: int): (<<iter int>>) ->
             else
                 `Some (state.x <- state.x + 1);
 
+let range_inf = fun (start: int): (<<iter int>>) ->
+    let state = {mut x = start} in
+        fun _ -> `Some (state.x <- state.x + 1);
+
 let fold = fun (type a b) (f: (b*a)->b, init: b, it: <<iter a>>) : b ->
     let vars = {mut acc=init} in
         loop
@@ -34,6 +38,9 @@ let for_each = fun (type a) (f: a -> any, it: <<iter a>>): any ->
             | `None _ -> `Break {}
             | `Some x -> `Continue (f x);
 
+let count = fun (it: <<iter any>>): int ->
+    fold((fun (acc, _) -> acc + 1), 0, it);
+
 let map = fun (type a b) (f: a -> b, it: <<iter a>>): (<<iter b>>) ->
     fun _ ->
         match it {} with
@@ -52,6 +59,9 @@ let map_1 = fun (type a b c) (f: a -> b, it: <<iter (c*a)>>): (<<iter (c*b)>>) -
             | `Some (x, y) -> `Some (x, (f y))
             | none -> none;
 
+let map_inner = fun (type a b) (f: a -> b, it: <<iter <<iter a>>>>): (<<iter <<iter b>>>>) ->
+    map((fun inner -> map(f, inner)), it);
+
 let filter = fun (type a) (f: a -> bool, it: <<iter a>>): (<<iter a>>) ->
     fun z ->
         loop
@@ -67,6 +77,18 @@ let filter_0 = fun (type a b) (f: a -> bool, it: <<iter (a*b)>>): (<<iter (a*b)>
 
 let filter_1 = fun (type a b) (f: b -> bool, it: <<iter (a*b)>>): (<<iter (a*b)>>) ->
     filter((fun(_,y)->f y), it);
+
+let any = fun (type a) (f: a -> bool, it: <<iter a>>) : bool ->
+    loop
+        match it {} with
+            | `Some x -> (if f x then `Break true else `Continue {})
+            | none -> `Break false;
+
+let all = fun (type a) (f: a -> bool, it: <<iter a>>) : bool ->
+    loop
+        match it {} with
+            | `Some x -> (if f x then `Continue {} else `Break false)
+            | none -> `Break true;
 
 let skip = fun (type a) (n: int, it: <<iter a>>) : (<<iter a>>) ->
     let state = {mut action=it; mut k=n} in
@@ -108,7 +130,27 @@ let chain = fun (type a) (ia: <<iter a>>, ib: <<iter a>>) : (<<iter a>>) ->
                 | none -> none)
             | some -> some;
 
+let enumerate = fun (type a) (it: <<iter a>>) : (<<iter (int*a)>>) ->
+    zip(range_inf(0), it);
+
+let sliding_pair = fun (type a) (it: <<iter a>>) : (<<iter (a*a)>>) ->
+    let state = {mut prev = `None {}} in
+    fun _ ->
+        match it {} with
+            | `None _ -> `None {}
+            | `Some x -> (
+                match state.prev with
+                    | `None _ -> (
+                        match it {} with
+                            | `None _ -> `None {}
+                            | `Some y -> (
+                                state.prev <- `Some y;
+                                `Some (x, y)))
+                    | `Some y -> (state.prev <- `Some x;
+                        `Some (y, x))                    
+            );
 
 {
-    chain; filter; filter_0; filter_1; fold; foldswap; for_each; map; map_0; map_1; range; skip; take; zip
+    all; any; chain; count; enumerate; filter; filter_0; filter_1; fold; foldswap; for_each; map; map_0; map_1; 
+    map_inner; range; range_inf; skip; sliding_pair; take; zip
 }

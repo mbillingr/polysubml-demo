@@ -1,7 +1,3 @@
-import "libs/io.ml";
-import "libs/iter.ml";
-import "libs/num.ml";
-import "libs/option.ml";
 
 let r = 3.99;
 let vars = {mut x=0.5; mut n=10000000};
