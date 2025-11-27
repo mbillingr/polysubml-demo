@@ -26,6 +26,8 @@ use std::io::Write;
 //static GLOBAL_ALLOCATOR: bdwgc_alloc::Allocator = bdwgc_alloc::Allocator;
 
 fn main() {
+    println!("{}", build_info::format!("{}", $));
+
     //unsafe { bdwgc_alloc::Allocator::initialize() }
 
     let mut state = GlobalState::new();
@@ -54,7 +56,7 @@ impl GlobalState {
             builtins::define_builtins(ast_interpreter::Env::new(), vm::Env::new(), &mut type_checker.strings);
 
         let processors: Vec<(_, Box<dyn AstProcessor>)> = vec![
-            ("Rust Compiler", Box::new(to_rust::State)),
+            //("Rust Compiler", Box::new(to_rust::State)),
             ("Bytecode Interpreter", Box::new(bytecode_interpreter::State::new(vm_env))),
             ("Ast Interpreter", Box::new(ast_interpreter::State::new(env))),
         ];

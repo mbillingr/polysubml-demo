@@ -143,6 +143,5 @@ let (panic, __read_line, __write_str, __chars, __split, __escape, __unescape, __
     });
 
     (__panic, __read_line, __write_str, __chars, __split, __escape, __unescape, __int_to_float, __float_to_int, __str_to_int, __str_to_float, __int_to_str, __float_to_str, __vec_new, __vec_length, __vec_push_back, __vec_pop_back, __vec_peek_back, __vec_push_front, __vec_pop_front, __vec_peek_front, __vec_get, __vec_set, __vec_split, __dict_new, __dict_length, __dict_insert, __dict_contains, __dict_remove, __dict_get)
-};println!("{}", (pts.clone()).apply(Value::record([])));
-
+};
 }
