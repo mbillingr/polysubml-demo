@@ -1,7 +1,7 @@
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 enum _Field { _0,_1,_2, }
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-enum _Tag { Break,Continue,Eof,Err,None,Ok,Right,Some, }
+enum _Tag { Break,Continue,Eof,Err,None,Ok,Some, }
 mod runtime; use runtime::*; 
 use num::ToPrimitive;
 fn main() {
@@ -143,32 +143,6 @@ let (panic, __read_line, __write_str, __chars, __split, __escape, __unescape, __
     });
 
     (__panic, __read_line, __write_str, __chars, __split, __escape, __unescape, __int_to_float, __float_to_int, __str_to_int, __str_to_float, __int_to_str, __float_to_str, __vec_new, __vec_length, __vec_push_back, __vec_pop_back, __vec_peek_back, __vec_push_front, __vec_pop_front, __vec_peek_front, __vec_get, __vec_set, __vec_split, __dict_new, __dict_length, __dict_insert, __dict_contains, __dict_remove, __dict_get)
-};let fibonacci'0 = Value::cell(Value::nothing());
-fibonacci'0.update_cell(Value::func({ let fibonacci'0 = fibonacci'0.clone(); move|arg| { let n'1 = arg;
- if (Value::bool((n'1.clone()).as_int() < (Value::int_literal(2)).as_int())).as_bool() { Value::int_literal(1) } else { Value::int(((fibonacci'0.clone()).apply(Value::int((n'1.clone()).as_int() - (Value::int_literal(1)).as_int()))).as_int() + ((fibonacci'0.clone()).apply(Value::int((n'1.clone()).as_int() - (Value::int_literal(2)).as_int()))).as_int()) } } }));
-
-let val'3 = (__str_to_int.clone()).apply({
-let _val_0 = (__read_line.clone()).apply(Value::record([]));
-match _val_0.as_case() {
-(_Tag::Ok, _val_0) => { let l'2 = _val_0;
- l'2.clone() }
-_ => { let _ = _val_0;
- (panic.clone()).apply(Value::str("could not read line")) }}});
-
-let n'7 = {
-let _val_1 = val'3.clone();
-match _val_1.as_case() {
-(_Tag::Some, _val_1) => { let x'4 = _val_1;
- x'4.clone() }
-(_Tag::Ok, _val_1) => { let x'5 = _val_1;
- x'5.clone() }
-(_Tag::Right, _val_1) => { let x'6 = _val_1;
- x'6.clone() }
-_ => { let _ = _val_1;
- (panic.clone()).apply(Value::str("unwrapped a fault value")) }}};
-
-let f'8 = (fibonacci'0.clone()).apply(n'7.clone());
-
-println!("{}", f'8.clone());
+};println!("{}", (pts.clone()).apply(Value::record([])));
 
 }

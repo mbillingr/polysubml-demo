@@ -120,8 +120,8 @@ impl Value {
         Value::string(s.to_string())
     }
 
-    pub fn string(s: String) -> Value {
-        Value::rc_str(Rc::new(s))
+    pub fn string(s: impl Into<String>) -> Value {
+        Value::rc_str(Rc::new(s.into()))
     }
 
     pub fn rc_str(s: Rc<String>) -> Value {

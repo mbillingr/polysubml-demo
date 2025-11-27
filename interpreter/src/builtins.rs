@@ -51,14 +51,28 @@ pub fn define_builtins(env: Env, vm_env: vm::Env, strings: &mut Rodeo) -> (Env, 
         Value::nothing()
     });
 
-    bb.bind_opt("__chars", |s, _| {
-        let mut chars = s.as_str().chars().rev().collect::<Vec<_>>();
-        chars.pop().map(|ch| Value::string(ch.to_string()))
+    let none = bb.val_none.clone();
+    let some = bb.tag_some;
+    bb.bind("__chars", move |s, _| {
+        let chars = RefCell::new(s.as_str().chars().rev().collect::<Vec<_>>());
+
+        let none = none.clone();
+        Value::builtin(move |_, _| match chars.borrow_mut().pop() {
+            None => none.clone(),
+            Some(x) => Value::case(some, Value::string(x)),
+        })
     });
 
-    bb.bind_opt("__split", |s, _| {
-        let mut parts = s.as_str().split_whitespace().rev().map(str::to_string).collect::<Vec<_>>();
-        parts.pop().map(Value::string)
+    let none = bb.val_none.clone();
+    let some = bb.tag_some;
+    bb.bind("__split", move |s, _| {
+        let parts = RefCell::new(s.as_str().split_whitespace().rev().map(str::to_string).collect::<Vec<_>>());
+
+        let none = none.clone();
+        Value::builtin(move |_, _| match parts.borrow_mut().pop() {
+            None => none.clone(),
+            Some(x) => Value::case(some, Value::string(x)),
+        })
     });
 
     bb.bind("__escape", move |s, _| {
