@@ -13,6 +13,10 @@ pub trait AstTransformer {
         TransformResult::Continue(pat)
     }
 
+    fn visit_binding(&mut self, var: ast::Variable) -> ast::Variable {
+        var
+    }
+
     fn post_visit_stmt(&mut self, stmt: ast::Statement) -> ast::Statement {
         stmt
     }
@@ -93,6 +97,7 @@ impl AstTransWalker for ast::Expr {
             ast::Expr::Match(mx) => ast::Expr::Match(ast::MatchExpr {
                 expr: mx.expr.transform(visitor),
                 cases: mx.cases.transform(visitor),
+                wildcard: mx.wildcard.transform(visitor),
             }),
 
             ast::Expr::Record(rec) => ast::Expr::Record(ast::RecordExpr {
@@ -147,12 +152,18 @@ impl AstTransWalker for ast::LetPattern {
         };
 
         let pat = match pat {
-            ast::LetPattern::Var(p) => ast::LetPattern::Var(p),
+            ast::LetPattern::Var(p) => ast::LetPattern::Var(p.transform(visitor)),
             ast::LetPattern::Record(r) => ast::LetPattern::Record(r.transform(visitor)),
             ast::LetPattern::Case(x, p) => ast::LetPattern::Case(x.transform(visitor), p.transform(visitor)),
         };
 
         visitor.post_visit_pattern(pat)
+    }
+}
+
+impl AstTransWalker for ast::Variable {
+    fn transform(self, visitor: &mut impl AstTransformer) -> Self {
+        visitor.visit_binding(self)
     }
 }
 

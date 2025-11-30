@@ -1,5 +1,6 @@
 pub use compiler_lib::ast::{Literal, Op, OpType, StringId};
 use compiler_lib::spans::Spanned;
+use std::collections::HashMap;
 
 pub fn simplify(script: Vec<compiler_lib::ast::Statement>) -> Vec<Statement> {
     to_stmts(script)
@@ -18,8 +19,11 @@ pub enum Statement {
 pub enum LetPattern {
     Case(StringId, Box<LetPattern>),
     Record(Vec<(StringId, LetPattern)>),
-    Var(Option<StringId>),
+    Var(Variable),
 }
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Variable(pub Option<StringId>);
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
@@ -107,7 +111,8 @@ pub struct LoopExpr {
 #[derive(Debug, Clone, PartialEq)]
 pub struct MatchExpr {
     pub expr: Box<Expr>,
-    pub cases: Vec<(LetPattern, Expr)>,
+    pub cases: Vec<(StringId, LetPattern, Expr)>,
+    pub wildcard: Option<(Variable, Box<Expr>)>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -137,6 +142,33 @@ pub fn block(stmts: impl IntoIterator<Item = Statement>, mut expr: Expr) -> Expr
     })
 }
 
+pub fn match_(expr: Expr, mut cases: Vec<(StringId, LetPattern, Expr)>, wildcard: Option<(Variable, Box<Expr>)>) -> Expr {
+    if cases.is_empty() && wildcard.is_some() {
+        let (var, arm) = wildcard.unwrap();
+        let stmts = vec![Statement::LetDef(LetPattern::Var(var), expr)];
+        return block(stmts, *arm);
+    }
+
+    if cases.len() == 1 && wildcard.is_none() {
+        let (tag, inner_pat, arm) = cases.pop().unwrap();
+        let pat = LetPattern::Case(tag, Box::new(inner_pat));
+
+        if expr_rebuilds_pattern(&pat, &arm) {
+            // e.g. the expression (match x with | `A y -> `A y) is equivalent to (x)
+            return expr;
+        }
+
+        let stmts = vec![Statement::LetDef(pat, expr)];
+        return block(stmts, arm);
+    }
+
+    Expr::Match(MatchExpr {
+        expr: Box::new(expr),
+        cases,
+        wildcard,
+    })
+}
+
 pub fn case(tag: StringId, expr: Expr) -> Expr {
     Expr::Case(CaseExpr {
         tag,
@@ -149,6 +181,43 @@ pub fn field_access(field: StringId, expr: Expr) -> Expr {
         expr: Box::new(expr),
         field,
     })
+}
+
+fn expr_rebuilds_pattern(pat: &LetPattern, expr: &Expr) -> bool {
+    match (pat, expr) {
+        (LetPattern::Var(Variable(Some(v))), Expr::Variable(vx)) => *v == vx.name,
+
+        (LetPattern::Case(tag, inner_pat), Expr::Case(cx)) => *tag == cx.tag && expr_rebuilds_pattern(inner_pat, &cx.expr),
+
+        (LetPattern::Record(fields), Expr::Record(rx)) => {
+            let fields: HashMap<_, _> = fields.iter().map(|(f, p)| (f, p)).collect();
+            let record: Option<HashMap<_, _>> = rx
+                .fields
+                .iter()
+                .map(|(f, v, m)| if *m { None } else { Some((*f, v)) })
+                .collect();
+            let Some(record) = record else { return false };
+
+            if fields.len() != record.len() {
+                return false;
+            }
+
+            for (f, p) in fields {
+                match record.get(f) {
+                    Some(v) => {
+                        if !expr_rebuilds_pattern(p, v) {
+                            return false;
+                        }
+                    }
+                    None => return false,
+                }
+            }
+
+            true
+        }
+
+        _ => false,
+    }
 }
 
 trait ToExpr {
@@ -225,10 +294,20 @@ impl ToExpr for compiler_lib::ast::Expr {
                 body: le.body.to_expr().into(),
             }),
 
-            compiler_lib::ast::Expr::Match(me) => Expr::Match(MatchExpr {
-                expr: me.expr.to_expr().into(),
-                cases: me.cases.into_iter().map(|(p, e)| (p.to_pat(), e.to_expr())).collect(),
-            }),
+            compiler_lib::ast::Expr::Match(me) => {
+                let mut wildcard = None;
+                let mut cases = vec![];
+                for ((pat, _), arm) in me.cases {
+                    let arm = arm.to_expr();
+                    match pat {
+                        compiler_lib::ast::LetPattern::Var((v, _), _) => wildcard = Some((Variable(v), Box::new(arm))),
+                        compiler_lib::ast::LetPattern::Case((tag, _), p) => cases.push((tag, p.to_pat(), arm)),
+                        compiler_lib::ast::LetPattern::Record(_) => unimplemented!(),
+                    }
+                }
+
+                match_(me.expr.to_expr(), cases, wildcard)
+            }
 
             compiler_lib::ast::Expr::Record(re) => Expr::Record(RecordExpr {
                 fields: re.fields.into_iter().map(|((f, _), e, m, _)| (f, e.to_expr(), m)).collect(),
@@ -272,7 +351,7 @@ impl ToPattern for compiler_lib::ast::LetPattern {
             compiler_lib::ast::LetPattern::Record(((_, fields), _)) => {
                 LetPattern::Record(fields.into_iter().map(|((f, _), p)| (f, p.to_pat())).collect())
             }
-            compiler_lib::ast::LetPattern::Var((var, _), _) => LetPattern::Var(var),
+            compiler_lib::ast::LetPattern::Var((var, _), _) => LetPattern::Var(Variable(var)),
         }
     }
 }

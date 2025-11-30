@@ -45,19 +45,19 @@ let map = fun (type a b) (f: a -> b, it: <<iter a>>): (<<iter b>>) ->
     fun _ ->
         match it {} with
             | `Some x -> `Some f x
-            | none -> none;
+            | `None _ -> `None {};
 
 let map_0 = fun (type a b c) (f: a -> b, it: <<iter (a*c)>>): (<<iter (b*c)>>) ->
     fun _ ->
         match it {} with
             | `Some (x, y) -> `Some ((f x), y)
-            | none -> none;
+            | `None _ -> `None {};
 
 let map_1 = fun (type a b c) (f: a -> b, it: <<iter (c*a)>>): (<<iter (c*b)>>) ->
     fun _ ->
         match it {} with
             | `Some (x, y) -> `Some (x, (f y))
-            | none -> none;
+            | `None _ -> `None {};
 
 let map_inner = fun (type a b) (f: a -> b, it: <<iter <<iter a>>>>): (<<iter <<iter b>>>>) ->
     map((fun inner -> map(f, inner)), it);
@@ -70,7 +70,7 @@ let filter = fun (type a) (f: a -> bool, it: <<iter a>>): (<<iter a>>) ->
                         `Break `Some x
                     else
                         `Continue z)
-                | none -> `Break none;
+                | `None _ -> `Break `None {};
 
 let filter_0 = fun (type a b) (f: a -> bool, it: <<iter (a*b)>>): (<<iter (a*b)>>) ->
     filter((fun(x,_)->f x), it);
@@ -82,13 +82,13 @@ let any = fun (type a) (f: a -> bool, it: <<iter a>>) : bool ->
     loop
         match it {} with
             | `Some x -> (if f x then `Break true else `Continue {})
-            | none -> `Break false;
+            | `None _ -> `Break false;
 
 let all = fun (type a) (f: a -> bool, it: <<iter a>>) : bool ->
     loop
         match it {} with
             | `Some x -> (if f x then `Continue {} else `Break false)
-            | none -> `Break true;
+            | `None _ -> `Break true;
 
 let skip = fun (type a) (n: int, it: <<iter a>>) : (<<iter a>>) ->
     let state = {mut action=it; mut k=n} in
@@ -118,8 +118,8 @@ let zip = fun (type a b) (ia: <<iter a>>, ib: <<iter b>>) : (<<iter (a*b)>>) ->
         match ia {} with
             | `Some x -> (match ib {} with
                 | `Some y -> `Some (x, y)
-                | none -> none)
-            | none -> none;
+                | `None _ -> `None {})
+            | `None _ -> `None {};
 
 let chain = fun (type a) (ia: <<iter a>>, ib: <<iter a>>) : (<<iter a>>) ->
     let state = {mut it=ia; mut next=`Some ib}
@@ -127,8 +127,8 @@ let chain = fun (type a) (ia: <<iter a>>, ib: <<iter a>>) : (<<iter a>>) ->
         match state.it {} with
             | `None _ -> (match state.next with
                 | `Some it -> (state.it <- it; it {})
-                | none -> none)
-            | some -> some;
+                | `None _ -> `None {})
+            | `Some x -> `Some x;
 
 let enumerate = fun (type a) (it: <<iter a>>) : (<<iter (int*a)>>) ->
     zip(range_inf(0), it);

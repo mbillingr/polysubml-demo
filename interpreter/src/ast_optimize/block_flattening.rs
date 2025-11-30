@@ -29,7 +29,7 @@ impl BlockFlattener {
             match stmt.transform(self) {
                 Expr(Block(inner_blk)) => {
                     out.extend(inner_blk.statements);
-                    out.push(LetDef(Var(None), *inner_blk.expr));
+                    out.push(LetDef(Var(ast::Variable(None)), *inner_blk.expr));
                 }
 
                 LetDef(pat, Block(val_blk)) => {

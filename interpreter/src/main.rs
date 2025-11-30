@@ -296,13 +296,24 @@ impl SimplePrint for runtime_ast::Expr {
             Match(mtch) => {
                 let mut out = format!("match {} with\n", mtch.expr.simple_print(indent, strings));
 
-                for (pat, expr) in &mtch.cases {
+                for (tag, pat, expr) in &mtch.cases {
                     out += &make_indent(indent + 1);
+                    out += strings.resolve(tag);
+                    out += " ";
                     out += &pat.simple_print(indent + 1, strings);
                     out += " -> ";
                     out += &expr.simple_print(indent + 1, strings);
                     out += "\n";
                 }
+
+                if let Some((var, expr)) = &mtch.wildcard {
+                    out += &make_indent(indent + 1);
+                    out += &var.simple_print(indent + 1, strings);
+                    out += " -> ";
+                    out += &expr.simple_print(indent + 1, strings);
+                    out += "\n";
+                }
+
                 out += &make_indent(indent);
                 out
             }
@@ -350,8 +361,7 @@ impl SimplePrint for runtime_ast::LetPattern {
     fn simple_print(&self, indent: usize, strings: &Rodeo) -> String {
         use runtime_ast::LetPattern::*;
         match self {
-            Var(None) => "_".to_string(),
-            Var(Some(v)) => strings.resolve(v).to_string(),
+            Var(v) => v.simple_print(indent, strings),
             Case(tag, pat) => format!("`{} {}", strings.resolve(tag), pat.simple_print(indent, strings)),
             Record(fields) => format!(
                 "{{{}}}",
@@ -361,6 +371,15 @@ impl SimplePrint for runtime_ast::LetPattern {
                     .collect::<Vec<_>>()
                     .join("; ")
             ),
+        }
+    }
+}
+
+impl SimplePrint for runtime_ast::Variable {
+    fn simple_print(&self, indent: usize, strings: &Rodeo) -> String {
+        match &self.0 {
+            None => "_".to_string(),
+            Some(v) => strings.resolve(v).to_string(),
         }
     }
 }

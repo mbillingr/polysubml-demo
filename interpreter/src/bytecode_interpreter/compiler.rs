@@ -53,9 +53,7 @@ impl<'a> CompilationContext<'a> {
 
     fn compile_pattern_assignment(&mut self, pat: ast::LetPattern) -> Vec<Op> {
         match pat {
-            ast::LetPattern::Var(None) => vec![Op::Drop],
-
-            ast::LetPattern::Var(Some(var)) => vec![Op::BindVar(var)],
+            ast::LetPattern::Var(var) => self.compile_var_assignment(var),
 
             ast::LetPattern::Case(_, inner_pat) => extend(vec![Op::UnwrapCase], self.compile_pattern_assignment(*inner_pat)),
 
@@ -71,6 +69,13 @@ impl<'a> CompilationContext<'a> {
                 }
                 ops
             }
+        }
+    }
+
+    fn compile_var_assignment(&mut self, var: ast::Variable) -> Vec<Op> {
+        match var.0 {
+            Some(var) => vec![Op::BindVar(var)],
+            None => vec![Op::Drop],
         }
     }
 
@@ -171,20 +176,15 @@ impl<'a> CompilationContext<'a> {
             ast::Expr::Match(mx) => {
                 let ops = self.compile_expression(*mx.expr);
 
-                let mut wildcard_arm = None;
                 let mut tag_arms = vec![];
-                for (pat, expr) in mx.cases {
-                    match pat {
-                        ast::LetPattern::Record(_) => unimplemented!(),
-                        ast::LetPattern::Var(_) => wildcard_arm = Some((pat, expr)),
-                        ast::LetPattern::Case(tag, inner_pat) => tag_arms.push((tag, *inner_pat, expr)),
-                    }
+                for (tag, inner_pat, expr) in mx.cases {
+                    tag_arms.push((tag, inner_pat, expr))
                 }
 
                 let mut last_branch = vec![];
 
-                if let Some((var, expr)) = wildcard_arm {
-                    last_branch = extend(self.compile_pattern_assignment(var), self.compile_expression(expr));
+                if let Some((var, expr)) = mx.wildcard {
+                    last_branch = extend(self.compile_var_assignment(var), self.compile_expression(*expr));
                 }
 
                 for (tag, pat, expr) in tag_arms {

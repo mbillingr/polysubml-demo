@@ -45,7 +45,7 @@ impl BlockFlattener {
                 for (f, x, _) in rec.fields {
                     match pats.remove(&f) {
                         Some(p) => out.extend(self.expand_let(p, x)),
-                        None => out.push(ast::Statement::LetDef(Var(None), x)),
+                        None => out.push(ast::Statement::LetDef(Var(ast::Variable(None)), x)),
                     }
                 }
                 out

@@ -5,7 +5,7 @@ use crate::runtime_ast as ast;
 use compiler_lib::ast::StringId;
 use im_rc::HashMap;
 
-/// Inline known functions...
+/// Inline known values...
 #[derive(Clone)]
 pub struct InlineTransformer {
     changes: usize,
@@ -15,6 +15,7 @@ pub struct InlineTransformer {
 #[derive(Clone, Debug)]
 enum Var {
     Unknown,
+    Arbitrary(ast::Expr),
     Variable(ast::VariableExpr),
     Literal(ast::LiteralExpr),
     Function(ast::FuncDefExpr),
@@ -36,8 +37,8 @@ impl InlineTransformer {
 
     fn bind(&mut self, pat: &ast::LetPattern, x: Var) {
         match pat {
-            ast::LetPattern::Var(None) => {}
-            ast::LetPattern::Var(Some(var)) => {
+            ast::LetPattern::Var(ast::Variable(None)) => {}
+            ast::LetPattern::Var(ast::Variable(Some(var))) => {
                 self.env.insert(*var, x);
             }
             ast::LetPattern::Case(_, pat) => self.bind(pat, self.unwrap_case(&x)),
@@ -61,19 +62,20 @@ impl InlineTransformer {
             ast::Expr::Case(cx) => Var::Case(cx.clone()),
             ast::Expr::Record(rec) => Var::Record(rec.clone()),
             ast::Expr::Block(blk) => {
-                if is_pure(&blk.expr) && free_vars(&blk.expr).is_empty() {
+                if free_vars(&blk.expr).is_empty() {
                     self.resolve_exp(&blk.expr)
                 } else {
                     Var::Unknown
                 }
             }
-            _ => Var::Unknown,
+            _ => Var::Arbitrary(exp.clone()), // if it's pure, we inline it...
         }
     }
 
     fn inline(&self, var: StringId) -> Option<ast::Expr> {
         match self.lookup(&var).unwrap_or(Var::Unknown) {
             Var::Unknown => None,
+            Var::Arbitrary(x) => Some(x),
             Var::Variable(vx) => Some(ast::Expr::Variable(vx)),
             Var::Literal(lit) => Some(ast::Expr::Literal(lit)),
             Var::Function(fd) => Some(ast::Expr::FuncDef(fd)),
@@ -89,6 +91,7 @@ impl InlineTransformer {
     fn unwrap_case(&self, v: &Var) -> Var {
         match v {
             Var::Unknown => Var::Unknown,
+            Var::Arbitrary(_) => Var::Unknown,
             Var::Variable(_) => Var::Unknown,
             Var::Literal(_) => unimplemented!(),
             Var::Function(_) => unimplemented!(),
@@ -99,6 +102,7 @@ impl InlineTransformer {
     fn get_field(&self, v: &Var, field_name: StringId) -> Var {
         match v {
             Var::Unknown => Var::Unknown,
+            Var::Arbitrary(_) => Var::Unknown,
             Var::Variable(_) => Var::Unknown,
             Var::Literal(_) => unimplemented!(),
             Var::Function(_) => unimplemented!(),

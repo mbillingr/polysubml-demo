@@ -121,13 +121,13 @@ impl AstTransformer for VariableRenamer<'_> {
         }
     }
 
-    fn pre_visit_pattern(&mut self, pat: ast::LetPattern) -> TransformResult<ast::LetPattern> {
-        match pat {
-            ast::LetPattern::Var(Some(v)) => {
+    fn visit_binding(&mut self, var: ast::Variable) -> ast::Variable {
+        match var.0 {
+            Some(v) => {
                 let newvar = self.bind(v);
-                TransformResult::Break(ast::LetPattern::Var(Some(newvar)))
+                ast::Variable(Some(newvar))
             }
-            _ => TransformResult::Continue(pat),
+            _ => ast::Variable(None),
         }
     }
 }

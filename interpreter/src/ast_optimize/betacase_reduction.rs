@@ -28,21 +28,22 @@ impl AstTransformer for KnownMatchTransformer {
             Match(mx) if matches!(&*mx.expr, Case(_)) => {
                 self.changes += 1;
                 let Case(cx) = *mx.expr else { unimplemented!() };
-                let mut wildcard = None;
-                for (pat, arm) in mx.cases {
-                    match pat {
-                        ast::LetPattern::Case(tag, _) => {
-                            if tag != cx.tag {
-                                continue;
-                            }
-                            return ast::block(vec![LetDef(pat, Case(cx))], arm);
-                        }
-                        _ => wildcard = Some((pat, arm)),
+                for (tag, pat, arm) in mx.cases {
+                    if tag != cx.tag {
+                        continue;
                     }
+                    return ast::block(vec![LetDef(ast::LetPattern::Case(tag, Box::new(pat)), Case(cx))], arm);
                 }
-                let (pat, arm) = wildcard.unwrap();
-                ast::block(vec![LetDef(pat, Case(cx))], arm)
+                let (var, arm) = mx.wildcard.unwrap();
+                ast::block(vec![LetDef(ast::LetPattern::Var(var), Case(cx))], *arm)
             }
+
+            Match(mx) if mx.cases.is_empty() => {
+                self.changes += 1;
+                let (var, arm) = mx.wildcard.unwrap();
+                ast::block(vec![LetDef(ast::LetPattern::Var(var), *mx.expr)], *arm)
+            }
+
             other => other,
         }
     }
@@ -67,6 +68,15 @@ mod tests {
     fn transform_wildcard_case() {
         let input = stmts("match `Bar 0 with | `Foo _ -> a | _ -> b");
         let expect = stmts("(let _ = `Bar 0; b)");
+
+        let output = input.transform(&mut KnownMatchTransformer::new());
+        assert_eq!(output, expect);
+    }
+
+    #[test]
+    fn transform_wildcard_only_match() {
+        let input = stmts("match x with | y -> y");
+        let expect = stmts("(let y = x; y)");
 
         let output = input.transform(&mut KnownMatchTransformer::new());
         assert_eq!(output, expect);

@@ -77,6 +77,7 @@ impl AstWalker for ast::Expr {
             ast::Expr::Match(mx) => {
                 mx.expr.walk_ast(visitor);
                 mx.cases.walk_ast(visitor);
+                mx.wildcard.walk_ast(visitor);
             }
 
             ast::Expr::Record(rec) => rec.fields.walk_ast(visitor),
@@ -131,6 +132,10 @@ impl AstWalker for ast::LetPattern {
     }
 }
 
+impl AstWalker for ast::Variable {
+    fn walk_ast(&self, _: &mut impl AstVisitor) {}
+}
+
 impl AstWalker for StringId {
     fn walk_ast(&self, _: &mut impl AstVisitor) {
         // this trivial impl allows us to walk tuples that contain stringids and ast nodes
@@ -165,6 +170,14 @@ impl<U: AstWalker, V: AstWalker, W: AstWalker> AstWalker for (U, V, W) {
 }
 
 impl<T: AstWalker> AstWalker for Vec<T> {
+    fn walk_ast(&self, visitor: &mut impl AstVisitor) {
+        for x in self {
+            x.walk_ast(visitor);
+        }
+    }
+}
+
+impl<T: AstWalker> AstWalker for [T] {
     fn walk_ast(&self, visitor: &mut impl AstVisitor) {
         for x in self {
             x.walk_ast(visitor);

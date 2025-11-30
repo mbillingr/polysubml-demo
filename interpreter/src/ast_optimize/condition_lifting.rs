@@ -32,10 +32,8 @@ impl AstTransformer for ConditionLiftTransformer {
                     }
 
                     let mut match_tags = HashSet::new();
-                    for (pat, _) in &m.cases {
-                        if let ast::LetPattern::Case(tag, _) = pat {
-                            match_tags.insert(*tag);
-                        }
+                    for (tag, _, _) in &m.cases {
+                        match_tags.insert(*tag);
                     }
 
                     if if_tags.is_disjoint(&match_tags) {
@@ -44,19 +42,50 @@ impl AstTransformer for ConditionLiftTransformer {
                             ..m
                         })
                     } else {
+                        self.changes += 1;
                         If(ast::IfExpr {
                             cond: if_.cond,
-                            then_expr: Box::new(Match(ast::MatchExpr {
-                                expr: if_.then_expr,
-                                cases: m.cases.clone(),
-                            })),
-                            else_expr: Box::new(Match(ast::MatchExpr {
-                                expr: if_.else_expr,
-                                cases: m.cases,
-                            })),
+                            then_expr: Box::new(ast::match_(*if_.then_expr, m.cases.clone(), m.wildcard.clone())),
+                            else_expr: Box::new(ast::match_(*if_.else_expr, m.cases, m.wildcard)),
                         })
                     }
                 }
+
+                Match(m2) => {
+                    let mut if_tags = HashSet::new();
+                    for (_, _, arm) in &m2.cases {
+                        if let Case(cx) = arm {
+                            if_tags.insert(cx.tag);
+                        }
+                    }
+
+                    let mut match_tags = HashSet::new();
+                    for (tag, _, _) in &m.cases {
+                        match_tags.insert(*tag);
+                    }
+
+                    if if_tags.difference(&match_tags).count() > 1 {
+                        // we would get more that one copy of the default branch
+                        Match(ast::MatchExpr {
+                            expr: Box::new(Match(m2)),
+                            ..m
+                        })
+                    } else {
+                        self.changes += 1;
+                        Match(ast::MatchExpr {
+                            expr: m2.expr,
+                            cases: m2
+                                .cases
+                                .into_iter()
+                                .map(|(t2, p2, x2)| (t2, p2, ast::match_(x2, m.cases.clone(), m.wildcard.clone())))
+                                .collect(),
+                            wildcard: m2
+                                .wildcard
+                                .map(|(var, expr)| (var, Box::new(ast::match_(*expr, m.cases.clone(), m.wildcard.clone())))),
+                        })
+                    }
+                }
+
                 _ => Match(m),
             },
             other => other,
@@ -78,11 +107,22 @@ mod tests {
         let output = input.transform(&mut ConditionLiftTransformer::new());
         assert_eq!(output, expect);
     }
-
     #[test]
     fn move_if_at_least_one_ifcase_occurs_in_match() {
         let input = stmts("match if a then `B b else c with | `A _ -> 1 | `B _ -> 2");
         let expect = stmts("if a then match `B b with | `A _ -> 1 | `B _ -> 2 else match c with | `A _ -> 1 | `B _ -> 2");
+
+        let output = input.transform(&mut ConditionLiftTransformer::new());
+        assert_eq!(output, expect);
+    }
+    #[test]
+    fn move_match_out_of_match() {
+        let input = stmts("match match x with | `Foo _ -> `A a | `Bar _ -> `B b with | `A _ -> 1 | `B _ -> 2");
+        let expect = stmts(
+            "match x with \
+                | `Foo _ -> (match `A a with | `A _ -> 1 | `B _ -> 2) \
+                | `Bar _ -> (match `B b with | `A _ -> 1 | `B _ -> 2)",
+        );
 
         let output = input.transform(&mut ConditionLiftTransformer::new());
         assert_eq!(output, expect);

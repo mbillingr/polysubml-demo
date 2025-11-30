@@ -121,9 +121,7 @@ impl<'a> CompilationContext<'a> {
 
     fn compile_pattern_assignment(&mut self, pat: ast::LetPattern, expr: String) -> String {
         match pat {
-            ast::LetPattern::Var(None) => format!("let _ = {};\n", expr),
-
-            ast::LetPattern::Var(Some(var)) => format!("let {} = {};\n", self.strings.resolve(&var), expr),
+            ast::LetPattern::Var(var) => self.compile_var_assignment(var, expr),
 
             ast::LetPattern::Case(_, inner_pat) => {
                 self.compile_pattern_assignment(*inner_pat, format!("({}).as_case().1", expr))
@@ -141,6 +139,13 @@ impl<'a> CompilationContext<'a> {
                 }
                 out
             }
+        }
+    }
+
+    fn compile_var_assignment(&mut self, var: ast::Variable, expr: String) -> String {
+        match var.0 {
+            None => format!("let _ = {};\n", expr),
+            Some(var) => format!("let {} = {};\n", self.strings.resolve(&var), expr),
         }
     }
 
@@ -264,14 +269,9 @@ impl<'a> CompilationContext<'a> {
             ast::Expr::Match(mx) => {
                 let val = self.compile_expression(*mx.expr);
 
-                let mut wildcard_arm = None;
                 let mut tag_arms = vec![];
-                for (pat, expr) in mx.cases {
-                    match pat {
-                        ast::LetPattern::Record(_) => unimplemented!(),
-                        ast::LetPattern::Var(_) => wildcard_arm = Some((pat, expr)),
-                        ast::LetPattern::Case(tag, inner_pat) => tag_arms.push((tag, *inner_pat, expr)),
-                    }
+                for (tag, inner_pat, expr) in mx.cases {
+                    tag_arms.push((tag, inner_pat, expr))
                 }
 
                 let tmp = self.gensym("val");
@@ -289,11 +289,11 @@ impl<'a> CompilationContext<'a> {
                     out += &format!("(_Tag::{tag}, {tmp}) => {{ {pat} {body} }}\n");
                 }
 
-                if let Some((pat, expr)) = wildcard_arm {
+                if let Some((pat, expr)) = mx.wildcard {
                     out += &format!(
                         "_ => {{ {} {} }}",
-                        self.compile_pattern_assignment(pat, tmp),
-                        self.compile_expression(expr)
+                        self.compile_var_assignment(pat, tmp),
+                        self.compile_expression(*expr)
                     );
                 } else {
                     out += "_ => unreachable!()";

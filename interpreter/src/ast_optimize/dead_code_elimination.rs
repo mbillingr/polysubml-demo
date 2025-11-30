@@ -34,10 +34,10 @@ impl DeadCodeTransformer {
         let mut out = VecDeque::new();
         while let Some(current_stmt) = stmts.pop() {
             match current_stmt {
-                LetDef(Var(Some(var)), expr) if !fvs.contains(&var) => {
+                LetDef(Var(ast::Variable(Some(var))), expr) if !fvs.contains(&var) => {
                     if !is_pure(&expr) {
                         fvs.extend(free_vars(&expr));
-                        out.push_front(LetDef(Var(None), expr.clone()));
+                        out.push_front(LetDef(Var(ast::Variable(None)), expr.clone()));
                     }
                     self.changes += 1;
                 }
@@ -68,7 +68,7 @@ impl AstTransformer for DeadCodeTransformer {
     fn post_visit_stmt(&mut self, stmt: ast::Statement) -> ast::Statement {
         use ast::LetPattern::*;
         match stmt {
-            ast::Statement::LetDef(Var(None), val) if is_pure(&val) => {
+            ast::Statement::LetDef(Var(ast::Variable(None)), val) if is_pure(&val) => {
                 self.changes += 1;
                 ast::Statement::Empty
             }
@@ -153,7 +153,6 @@ mod tests {
     fn eliminate_indirectly_nested_unused_variables() {
         let input = stmts("begin let x = 1 in 1 + begin let y = x in 0 end end");
         let expect = stmts("1 + 0");
-        println!("{:?}", input);
 
         let output = DeadCodeTransformer::new().transform_stmts(input, true);
         assert_eq!(output, expect);
@@ -163,7 +162,6 @@ mod tests {
     fn eliminate_indirectly_chained_unused_variables() {
         let input = stmts("begin let x = 1; let y = x; 0 end");
         let expect = stmts("0");
-        println!("{:?}", input);
 
         let output = DeadCodeTransformer::new().transform_stmts(input, true);
         assert_eq!(output, expect);

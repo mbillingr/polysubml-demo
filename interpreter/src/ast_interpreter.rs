@@ -192,27 +192,21 @@ impl<'a> Context<'a> {
                 let val0 = self.eval(&mx.expr);
                 let (tag, val) = val0.as_case();
 
-                let mut wildcard = None;
-                for (pat, arm) in &mx.cases {
-                    match pat {
-                        ast::LetPattern::Case(t, p) => {
-                            if *t != tag {
-                                continue;
-                            }
-                            let env = match_pattern(&p, Cow::Borrowed(&val), &self.state.env).unwrap();
-                            let old_env = std::mem::replace(&mut self.state.env, env);
-                            let result = self.eval(&arm);
-                            self.state.env = old_env;
-                            return result;
-                        }
-                        _ => wildcard = Some((pat, arm)),
+                for (t, p, arm) in &mx.cases {
+                    if *t != tag {
+                        continue;
                     }
+                    let env = match_pattern(&p, Cow::Borrowed(&val), &self.state.env).unwrap();
+                    let old_env = std::mem::replace(&mut self.state.env, env);
+                    let result = self.eval(&arm);
+                    self.state.env = old_env;
+                    return result;
                 }
 
-                let (pat, arm) = wildcard.unwrap();
-                let env = match_pattern(&pat, Cow::Owned(val0), &self.state.env).unwrap();
+                let (var, arm) = mx.wildcard.as_ref().unwrap();
+                let env = match_var(var, Cow::Owned(val0), &self.state.env).unwrap();
                 let old_env = std::mem::replace(&mut self.state.env, env);
-                let result = self.eval(&arm);
+                let result = self.eval(arm);
                 self.state.env = old_env;
                 result
             }
@@ -235,8 +229,7 @@ impl<'a> Context<'a> {
 
 fn match_pattern(pat: &ast::LetPattern, val: Cow<Value>, env: &Env) -> Option<Env> {
     match pat {
-        ast::LetPattern::Var(None) => Some(env.clone()),
-        ast::LetPattern::Var(Some(var)) => Some(env.bind(*var, val.into_owned())),
+        ast::LetPattern::Var(var) => match_var(var, val, env),
 
         ast::LetPattern::Case(tag, inner_pat) => {
             let (actual_tag, inner_val) = val.as_case();
@@ -256,10 +249,17 @@ fn match_pattern(pat: &ast::LetPattern, val: Cow<Value>, env: &Env) -> Option<En
     }
 }
 
+fn match_var(ast::Variable(var): &ast::Variable, val: Cow<Value>, env: &Env) -> Option<Env> {
+    match var {
+        None => Some(env.clone()),
+        Some(var) => Some(env.bind(*var, val.into_owned())),
+    }
+}
+
 fn assign(pat: &ast::LetPattern, val: Cow<Value>, env: &mut Env) {
     match pat {
-        ast::LetPattern::Var(None) => {}
-        ast::LetPattern::Var(Some(var)) => {
+        ast::LetPattern::Var(ast::Variable(None)) => {}
+        ast::LetPattern::Var(ast::Variable(Some(var))) => {
             let bnd = env.bind(*var, val.into_owned());
             *env = bnd;
         }
