@@ -44,6 +44,14 @@ let unwrap = fun (type a)
     | `Right x -> x
     | _ -> panic "unwrapped a fault value";
 
+let unwrap_or = fun (type a) (default: a): ([`Some a | `None any | `Ok a | `Err any | `Right a | `Left any] -> a) ->
+  fun val ->
+    match val with
+      | `Some x -> x
+      | `Ok x -> x
+      | `Right x -> x
+      | _ -> default;
+
 {
-  map; map_err; unwrap; and_then
+  and_then; map; map_err; unwrap; unwrap_or
 }

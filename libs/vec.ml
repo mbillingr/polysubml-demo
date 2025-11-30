@@ -19,6 +19,15 @@ let iter_rev = __vec_iter_rev;
 
 let is_empty = fun xs -> (length xs) == 0;
 
+let equal = fun (type a b) (xs: (vec@a), ys: (vec@b), eq: (a*b)->bool) : bool ->
+    if length xs != length ys 
+      then false 
+      else iterator.all(
+        eq,
+        iterator.zip(iter xs, iter ys)
+      );
+      
+
 let front = fun (type a) (xs: (vec@a)) : a ->
   match peek_front xs with
     | `None _ -> panic "empty vec"
@@ -102,7 +111,7 @@ let remove_at = fun (type a) (xs: (vec@a), i: int) : (vec@a) -> begin
 end;
 
 {
-    append; back; collect; collect_rev; empty; filter; foldl; foldr; front; get; is_empty; iter;
+    append; back; collect; collect_rev; empty; equal; filter; foldl; foldr; front; get; is_empty; iter;
     iter_rev; length; map; merge_sorted; peek; peek_back; peek_front; pop_back; pop_front; push_back;
     push_front; remove_at; reverse; sort_by; sort_int; split
 }

@@ -96,6 +96,8 @@ impl TypeckState {
 
         self.declare_builtin("__chars", "str -> (any -> [`Some str | `None any])", smgr, strings);
         self.declare_builtin("__split", "str -> (any -> [`Some str | `None any])", smgr, strings);
+        self.declare_builtin("__char_to_num", "str -> int", smgr, strings);
+        self.declare_builtin("__num_to_char", "int -> str", smgr, strings);
         self.declare_builtin("__escape", "str -> str", smgr, strings);
         self.declare_builtin("__unescape", "str -> str", smgr, strings);
 

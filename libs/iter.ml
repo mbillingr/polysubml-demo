@@ -121,6 +121,20 @@ let zip = fun (type a b) (ia: <<iter a>>, ib: <<iter b>>) : (<<iter (a*b)>>) ->
                 | `None _ -> `None {})
             | `None _ -> `None {};
 
+let flatten = fun (type a) (it: <<iter <<iter a>>>>) : (<<iter a>>) ->
+    let state = {mut inner=`None {}; mut outer=it}
+    in fun _ ->
+        loop
+            match state.inner with
+                | `Some inner_it -> (
+                    match inner_it {} with
+                        | `Some x -> `Break `Some x
+                        | `None _ -> (state.inner <- `None {}; `Continue {}))
+                | `None _ -> (
+                    match state.outer {} with
+                        | `Some new_inner -> (state.inner <- `Some new_inner; `Continue {})
+                        | `None _ -> `Break `None {});
+
 let chain = fun (type a) (ia: <<iter a>>, ib: <<iter a>>) : (<<iter a>>) ->
     let state = {mut it=ia; mut next=`Some ib}
     in fun _ ->
@@ -151,6 +165,6 @@ let sliding_pair = fun (type a) (it: <<iter a>>) : (<<iter (a*a)>>) ->
             );
 
 {
-    all; any; chain; count; enumerate; filter; filter_0; filter_1; fold; foldswap; for_each; map; map_0; map_1; 
+    all; any; chain; count; enumerate; filter; filter_0; filter_1; flatten; fold; foldswap; for_each; map; map_0; map_1; 
     map_inner; range; range_inf; skip; sliding_pair; take; zip
 }

@@ -68,7 +68,9 @@ impl InlineTransformer {
                     Var::Unknown
                 }
             }
-            _ => Var::Arbitrary(exp.clone()), // if it's pure, we inline it...
+            // Todo: inlining arbitrary expressions seems to cause crashes (e.g. `parsing.parse("foo", parsing.text("foo"))`)
+            // _ => Var::Arbitrary(exp.clone()), // if it's pure, we inline it...
+            _ => Var::Unknown,
         }
     }
 

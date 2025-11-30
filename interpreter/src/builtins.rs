@@ -75,6 +75,14 @@ pub fn define_builtins(env: Env, vm_env: vm::Env, strings: &mut Rodeo) -> (Env, 
         })
     });
 
+    bb.bind("__char_to_num", move |s, _| {
+        Value::int(s.as_str().chars().next().map(|x| x as i64).unwrap_or(-1).into())
+    });
+
+    bb.bind_opt("__num_to_char", move |i, _| {
+        i.as_int().to_u32().and_then(char::from_u32).map(|ch| Value::string(ch))
+    });
+
     bb.bind("__escape", move |s, _| {
         Value::string(String::from_utf8(escape_bytes::escape(s.as_str().bytes())).unwrap())
     });
