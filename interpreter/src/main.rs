@@ -17,53 +17,83 @@ mod value;
 use crate::ast_processor::AstProcessor;
 use crate::expand::expand_syntax;
 use bytecode_interpreter::vm;
+use clap::{Parser, ValueEnum};
 use compiler_lib::ast::{LetPattern, StringId};
 use compiler_lib::spans::{Spanned, SpannedError};
 use compiler_lib::{Rodeo, State};
 use std::collections::HashMap;
 use std::io::Write;
+
 //#[global_allocator]
 //static GLOBAL_ALLOCATOR: bdwgc_alloc::Allocator = bdwgc_alloc::Allocator;
 
-fn main() {
-    println!("{}", build_info::format!("{}", $));
+#[derive(Debug, Parser)]
+struct Cli {
+    #[arg(short, long, default_value_t = Backend::Bytecode)]
+    target: Backend,
 
+    #[arg(short, long)]
+    script: bool,
+
+    files: Vec<String>,
+}
+
+#[derive(Clone, Debug, ValueEnum)]
+enum Backend {
+    Bytecode,
+    Ast,
+    Rust,
+}
+
+impl ToString for Backend {
+    fn to_string(&self) -> String {
+        format!("{:?}", self).to_lowercase()
+    }
+}
+
+fn main() {
     //unsafe { bdwgc_alloc::Allocator::initialize() }
 
-    let mut state = GlobalState::new();
+    let args = Cli::parse();
+    println!("{:?}", args);
 
-    let args: Vec<String> = std::env::args().collect();
-    if args.len() > 1 {
-        let src = std::fs::read_to_string(&args[1]).unwrap();
+    println!("{}", build_info::format!("{}", $));
+
+    let mut state = GlobalState::new(args.target);
+
+    for file in &args.files {
+        let src = std::fs::read_to_string(file).unwrap();
         state.run_script(&src);
-    } else {
+    }
+
+    if !args.script {
         state.repl();
     }
 }
 
 struct GlobalState {
     type_checker: State,
-    processors: Vec<(&'static str, Box<dyn AstProcessor>)>,
+    backend: Box<dyn AstProcessor>,
     known_modules: HashMap<StringId, Option<StringId>>,
 }
 
 impl GlobalState {
-    fn new() -> Self {
+    fn new(backend: Backend) -> Self {
         let mut type_checker = State::new();
         type_checker.add_builtins();
 
         let (env, vm_env) =
             builtins::define_builtins(ast_interpreter::Env::new(), vm::Env::new(), &mut type_checker.strings);
 
-        let processors: Vec<(_, Box<dyn AstProcessor>)> = vec![
-            //("Rust Compiler", Box::new(to_rust::State)),
-            ("Bytecode Interpreter", Box::new(bytecode_interpreter::State::new(vm_env))),
-            ("Ast Interpreter", Box::new(ast_interpreter::State::new(env))),
-        ];
+        let backend: Box<dyn AstProcessor> = match backend {
+            Backend::Rust => Box::new(to_rust::State),
+            Backend::Bytecode => Box::new(bytecode_interpreter::State::new(vm_env)),
+            Backend::Ast => Box::new(ast_interpreter::State::new(env)),
+        };
 
         GlobalState {
             type_checker,
-            processors,
+            backend,
             known_modules: Default::default(),
         }
     }
@@ -138,13 +168,11 @@ impl GlobalState {
             println!("{};", stmt.simple_print(0, self.strings()));
         }
 
-        for (name, proc) in &mut self.processors {
-            proc.process_script(&ast, &mut self.type_checker.strings);
+        self.backend.process_script(&ast, &mut self.type_checker.strings);
 
-            let t5 = std::time::Instant::now();
-            times.push((*name, t5 - t4));
-            t4 = t5;
-        }
+        let t5 = std::time::Instant::now();
+        times.push(("backend", t5 - t4));
+        t4 = t5;
 
         times.push(("total", t4 - t0));
 
