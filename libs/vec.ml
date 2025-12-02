@@ -1,4 +1,5 @@
 import "iter.ml";
+import "pbar.ml";
 
 let iterator = iter;
 
@@ -110,8 +111,16 @@ let remove_at = fun (type a) (xs: (vec@a), i: int) : (vec@a) -> begin
   collect(xs_)
 end;
 
+let iter_pbar = fun (type a) (xs: (vec@a)): (<<iter a>>) ->
+    let prog = pbar.new length xs in
+    let it = iter xs in
+    fun _ ->
+        match it {} with
+            | `Some x -> (pbar.step(prog, 1); `Some x)
+            | `None _ -> (pbar.finish prog; `None {});
+
 {
-    append; back; collect; collect_rev; empty; equal; filter; foldl; foldr; front; get; is_empty; iter;
+    append; back; collect; collect_rev; empty; equal; filter; foldl; foldr; front; get; is_empty; iter; iter_pbar;
     iter_rev; length; map; merge_sorted; peek; peek_back; peek_front; pop_back; pop_front; push_back;
     push_front; remove_at; reverse; sort_by; sort_int; split
 }

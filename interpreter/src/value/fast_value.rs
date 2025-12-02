@@ -1,8 +1,9 @@
-use crate::compiler::Op;
-use crate::interpreter::Env;
+use crate::ast_interpreter::Env;
+use crate::bytecode_interpreter::compiler::Op;
+use crate::runtime_ast as ast;
 use crate::{builtins, vm};
+use compiler_lib::Rodeo;
 use compiler_lib::ast::StringId;
-use compiler_lib::{Rodeo, ast};
 pub use im_rc::{HashMap as ImHashMap, Vector};
 use indicatif::ProgressBar;
 use std::collections::HashMap;
@@ -74,8 +75,8 @@ impl Value {
         Value::string(s.to_string())
     }
 
-    pub fn string(s: String) -> Value {
-        Value::new_ptr(s.into_boxed_str())
+    pub fn string(s: impl Into<String>) -> Value {
+        Value::new_ptr(s.into().into_boxed_str())
     }
 
     pub fn as_str(&self) -> &str {
