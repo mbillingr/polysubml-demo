@@ -5,6 +5,13 @@
 //
 // I'm not sure if it is a good idea to combine these types... we'll see :)
 
+let is_positive = fun (val : [`Some any | `None any | `Ok any | `Err any | `Right any | `Left any]): bool ->
+      match val with
+        | `Some _ -> true
+        | `Ok _ -> true
+        | `Right _ -> true
+        | _ -> false;
+
 let map = fun (type a b c)
       (f : a -> b,
        val : [`Some a | `None c | `Ok a | `Err c | `Right a | `Left c]
@@ -53,5 +60,5 @@ let unwrap_or = fun (type a) (default: a): ([`Some a | `None any | `Ok a | `Err 
       | _ -> default;
 
 {
-  and_then; map; map_err; unwrap; unwrap_or
+  and_then; is_positive; map; map_err; unwrap; unwrap_or
 }

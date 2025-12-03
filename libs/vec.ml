@@ -27,7 +27,6 @@ let equal = fun (type a b) (xs: (vec@a), ys: (vec@b), eq: (a*b)->bool) : bool ->
         eq,
         iterator.zip(iter xs, iter ys)
       );
-      
 
 let front = fun (type a) (xs: (vec@a)) : a ->
   match peek_front xs with
@@ -90,9 +89,12 @@ let merge_sorted = fun (type a) (cmp : ((a*a)->bool), xs : vec@a, ys : vec@a) : 
           | other -> other
     );
 
+let is_sorted = fun (type a) (cmp : ((a*a)->bool), xs : vec@a) : bool ->
+  iterator.all(cmp, iterator.sliding_pair iter xs);
+
 let rec sort_by = fun (type a) (cmp : ((a*a)->bool), xs : vec@a) : (vec@a) ->
-    if length xs < 2 then xs else
-    let (lhs, rhs) = split(xs, (__vec_length xs) / 2) in
+    if length xs < 2 || is_sorted(cmp, xs) then xs 
+    else let (lhs, rhs) = split(xs, (__vec_length xs) / 2) in
         merge_sorted(cmp, sort_by(cmp, lhs), sort_by(cmp, rhs));
 
 let sort_int = fun (xs : vec@int) : (vec@int) ->

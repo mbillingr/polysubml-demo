@@ -35,6 +35,9 @@ struct Cli {
     #[arg(short, long)]
     script: bool,
 
+    #[arg(short, long)]
+    no_opt: bool,
+
     files: Vec<String>,
 }
 
@@ -59,7 +62,7 @@ fn main() {
 
     println!("{}", build_info::format!("{}", $));
 
-    let mut state = GlobalState::new(args.target);
+    let mut state = GlobalState::new(args.target, !args.no_opt);
 
     for file in &args.files {
         let src = std::fs::read_to_string(file).unwrap();
@@ -75,10 +78,11 @@ struct GlobalState {
     type_checker: State,
     backend: Box<dyn AstProcessor>,
     known_modules: HashMap<StringId, Option<StringId>>,
+    optimize: bool,
 }
 
 impl GlobalState {
-    fn new(backend: Backend) -> Self {
+    fn new(backend: Backend, optimize: bool) -> Self {
         let mut type_checker = State::new();
         type_checker.add_builtins();
 
@@ -95,6 +99,7 @@ impl GlobalState {
             type_checker,
             backend,
             known_modules: Default::default(),
+            optimize,
         }
     }
 
@@ -156,10 +161,12 @@ impl GlobalState {
         let t3 = std::time::Instant::now();
         times.push(("type-check", t3 - t2));
 
-        let ast = runtime_ast::simplify(ast);
+        let mut ast = runtime_ast::simplify(ast);
 
         // only consider the REPL to be top-level
-        let ast = ast_optimize::optimize_script(ast, in_repl, &mut self.type_checker.strings);
+        if self.optimize {
+            ast = ast_optimize::optimize_script(ast, in_repl, &mut self.type_checker.strings);
+        }
 
         let mut t4 = std::time::Instant::now();
         times.push(("optimize ast", t4 - t3));

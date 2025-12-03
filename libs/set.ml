@@ -56,5 +56,5 @@ let rec obj = fun (type a) (xs: <<set a>>) : (rec set_obj = {
 
 {
     collect; contains; difference; empty; insert; intersection; iter; length; map; obj; remove; symmetric_difference;
-    union; xor
+    union; update; xor
 }

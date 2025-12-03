@@ -17,12 +17,27 @@ let range_inf = fun (start: int): (<<iter int>>) ->
     let state = {mut x = start} in
         fun _ -> `Some (state.x <- state.x + 1);
 
+let repeat = fun (type a) (x: a, n: int): (<<iter a>>) ->
+    let state = {mut i = n} in
+        fun _ ->
+            if state.i <= 0 then
+                `None {}
+            else
+                (state.i <- state.i - 1; `Some x);
+
 let fold = fun (type a b) (f: (b*a)->b, init: b, it: <<iter a>>) : b ->
     let vars = {mut acc=init} in
         loop
             match it {} with
                 | `None _ -> `Break vars.acc
                 | `Some x -> `Continue (vars.acc <- f(vars.acc, x));
+
+let scan = fun (type a b) (f: (b*a)->b, init: b, it: <<iter a>>) : (<<iter b>>) ->
+    let vars = {mut acc=init} in
+        fun _ ->
+            match it {} with
+                | `None _ -> `None {}
+                | `Some x -> (vars.acc <- f(vars.acc, x); `Some vars.acc);
 
 // same as fold but function arguments swapped
 let foldswap = fun (type a b) (f: (a*b)->b, init: b, it: <<iter a>>) : b ->
@@ -77,6 +92,20 @@ let filter_0 = fun (type a b) (f: a -> bool, it: <<iter (a*b)>>): (<<iter (a*b)>
 
 let filter_1 = fun (type a b) (f: b -> bool, it: <<iter (a*b)>>): (<<iter (a*b)>>) ->
     filter((fun(_,y)->f y), it);
+
+let take_while = fun (type a) (f: a -> bool, it: <<iter a>>): (<<iter a>>) ->
+    let state = {mut take=true} in
+    fun z ->
+        if state.take
+            then match it {} with
+                | `Some x -> (if f x
+                    then `Some x
+                    else (
+                        state.take <- false;
+                        `None {}
+                    ))
+                | `None _ -> `None {}
+            else `None {};
 
 let any = fun (type a) (f: a -> bool, it: <<iter a>>) : bool ->
     loop
@@ -164,7 +193,10 @@ let sliding_pair = fun (type a) (it: <<iter a>>) : (<<iter (a*a)>>) ->
                         `Some (y, x))                    
             );
 
+let find_idx = fun (it: <<iter bool>>): int ->
+    count take_while((fun b -> b), it);
+
 {
-    all; any; chain; count; enumerate; filter; filter_0; filter_1; flatten; fold; foldswap; for_each; map; map_0; map_1; 
-    map_inner; range; range_inf; skip; sliding_pair; take; zip
+    all; any; chain; count; enumerate; filter; filter_0; filter_1; flatten; find_idx; fold; foldswap; for_each; 
+    map; map_0; map_1; map_inner; range; range_inf; repeat; scan; skip; sliding_pair; take; take_while; zip
 }

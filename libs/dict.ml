@@ -39,8 +39,8 @@ let map_vals = fun (type k1 k2 v) (f: k1 -> k2, d: (dict@k1*v)) : (dict@k2*v) ->
 let union = fun (type k v) (d1: (dict@k*v), d2: (dict@k*v)) : (dict@k*v) ->
     iter.fold(insert_pair[k=k; v=v], d1, items d2);
 
-let intersection = fun (type k v) (d1: (dict@k*v), d2: (dict@k*v)) : (dict@k*v) ->
-    collect iter.filter_0((fun k -> contains(d1, k)), items d2);
+let intersection = fun (type k v) (d1: (dict@k*v), d2: (dict@k*any)) : (dict@k*v) ->
+    collect iter.filter_0((fun k -> contains(d2, k)), items d1);
 
 let not = fun x -> if x then false else true;
 
@@ -60,9 +60,20 @@ let count = fun (type k) (it: <<iter k>>): (dict@k*int) ->
         empty,
         it);
 
+let merge = fun (type k v) (f: v*v -> v, d: (dict@k*v), it: <<iter (k*v)>>) : (dict@k*v) ->
+     iter.fold(
+        (fun(d,(k, w)) -> 
+            insert(d, k, 
+                (match get(d, k) with
+                    | `None _ -> w
+                    | `Some v -> f(v, w)))
+            
+        ),
+        d, it);
+
 let symmetric_difference = xor;
 
 {
     collect; contains; count; difference; empty; get; get_or; insert; insert_pair; intersection; items; keys; length;
-    map_keys; map_vals; remove; symmetric_difference; union; vals; xor
+    map_keys; map_vals; merge; remove; symmetric_difference; union; vals; xor
 }

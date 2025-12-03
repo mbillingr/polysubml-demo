@@ -328,8 +328,9 @@ impl PartialEq for Value {
             (Record(a), Record(b)) => Rc::ptr_eq(a, b),
             (Callable(a), Callable(b)) => Rc::ptr_eq(a, b),
             (Env(a), Env(b)) => a == b,
-            (Vect(a), Vect(b)) => a.is_empty() && b.is_empty() || a.ptr_eq(b),
-            (Dict(a), Dict(b)) => a.is_empty() && b.is_empty() || a.ptr_eq(b),
+            // we don't have a pointer-based hash for vectors and dicts, so we must compare by value
+            (Vect(a), Vect(b)) => a.ptr_eq(b) || a == b,
+            (Dict(a), Dict(b)) => a.ptr_eq(b) || a == b,
             _ => false,
         }
     }

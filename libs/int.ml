@@ -1,14 +1,40 @@
+import "iter.ml";
+
+let add = fun(a, b) -> a + b;
+let div = fun(a, b) -> a / b;
+
+let log = fun(base: int, n: int) ->
+    let vars = {mut n=1; mut lg=0} in
+        loop
+            if vars.n > n
+                then `Break (vars.lg - 1)
+                else `Continue (
+                    vars.n <- vars.n * base;
+                    vars.lg <- vars.lg + 1
+                );
+
+let pow = fun(base: int, n:int) ->
+    let vars = {mut out=1; mut n=n} in
+        loop
+            if vars.n <= 0
+                then `Break vars.out
+                else `Continue (vars.out <- vars.out * base; vars.n <- vars.n - 1);
+
+
 {
     to_float = __int_to_float; 
     from_float = __float_to_int; 
     to_str = __int_to_str; 
     from_str = __str_to_int; 
     
-    add = fun(a, b) -> a + b; 
+    add = add; 
     sub = fun(a, b) -> a - b; 
     mul = fun(a, b) -> a * b; 
-    div = fun(a, b) -> a / b; 
-    mod = fun(a, b) -> a % b; 
+    div = div;
+    mod = fun(a, b) -> a % b;
+
+    floor_div = div;
+    ceil_div = fun (a, b) -> (a + b - 1) / b;
     
     abs = fun n -> if n < 0 then 0 - n else n; 
 
@@ -16,6 +42,8 @@
 
     min = fun (a, b) -> if a < b then a else b;
     max = fun (a, b) -> if a > b then a else b;
+
+    sum = fun (it) -> iter.fold(add, 0, it);
     
     sqrt = fun n ->
         if n < 1 then
@@ -32,5 +60,24 @@
                 state.prev2 <- prev1;
                 state.prev1 <- x1;
             	`Continue {}
-            ))
+            ));
+
+    log = log;
+    pow = pow;
+
+    // repeat a number n times
+    repeat = fun(d: int, n: int) ->
+        let factor = pow(10, log(10, d) + 1) in
+        let vars = {mut x=0; mut n=n} in
+            loop
+                if vars.n <= 0
+                    then `Break vars.x
+                    else `Continue (vars.x <- vars.x * factor + d; vars.n <- vars.n - 1);
+
+    round_to_multiple = fun n -> fun k -> begin
+        let floored = (k / n) * n;
+        let remainder = k - floored;
+        let rounding = ((remainder * 2) / n) * n;
+        floored + rounding
+    end
 }

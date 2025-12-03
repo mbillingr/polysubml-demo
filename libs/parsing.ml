@@ -11,11 +11,11 @@ let type <<result t>> = [`Ok {result:t; rest:vec@str} | `Err str];
 let type <<parser r>> = (vec@str) -> <<result r>>;
 
 
-let parse = fun(text, parser) -> begin
+let parse = fun (type r) (text: str, parser: <<parser r>>): [`Ok r | `Err str] -> begin
 	let chs = vec.collect str.chars text;
 	match parser(chs) with
         | `Ok {result; rest} -> `Ok result
-        | `Err _ -> `None {}
+        | `Err e -> `Err e
 end;
 
 

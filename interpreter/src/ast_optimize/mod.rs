@@ -29,10 +29,12 @@ pub fn optimize_script(
         // Run alpha conversion before every pass, because transformations that duplicate code may have broken the variable name assumption.
         script = script.transform(&mut VariableRenamer::new(toplevel, strings));
 
-        // Todo: should we run alpha conversion *again* after inlining? (inlining may produce duplicate bindings that violate the assumption of other passes)
         let mut inliner = InlineTransformer::new();
         script = script.transform(&mut inliner);
         changes += inliner.changes();
+
+        // alpha-convert duplicate bindings introduced by inlining
+        script = script.transform(&mut VariableRenamer::new(toplevel, strings));
 
         let mut betarec_reducer = betarec_reduction::DirectFieldAccessTransformer::new();
         script = script.transform(&mut betarec_reducer);
