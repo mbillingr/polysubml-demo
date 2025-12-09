@@ -1,17 +1,19 @@
 This is a fork of PolySubML that adds the following features:
 
 * An ad-hoc interpreter written in Rust. This is likely less efficient than compilation to Javascript,
-  but makes it easier for me to add new runtime-related features:
+  but makes it easier for me to add and change runtime-related features:
     * Builtin functions for reading from stdin
     * Builtin functions for writing to stdout (partially done)
     * Builtin functions for string manipulation
     * Builtin functions for number conversion
-  (I also added compilation to Rust, but this is not much faster than the interpreter; at least with
+    * Recursively compare records for equality (the original pointer equality prevent their use as mapping keys)
+  (I also played with compilation to Rust, but this is not much faster than the interpreter; at least with
   the current naive Value representation)
 * Some features are added as new AST nodes that need to be transformed into core language AST nodes.
     * Module system
-    * Module-wide type definitions
+    * Module-local type definitions
     * Syntax for empty tuples (to make calling functions without args more natural)
+    * Short-circuiting and/or operators
 * A few features require extending the core typechecker
     * Arrays/Vectors
     * Dictionaries

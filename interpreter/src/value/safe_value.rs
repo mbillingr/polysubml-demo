@@ -37,7 +37,7 @@ pub enum Value {
     PBar(ProgressBar),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Field {
     Imm(Value),
     Mut(RefCell<Value>),
@@ -63,6 +63,15 @@ impl Field {
         match self {
             Field::Imm(_) => panic!("Cannot set immutable field"),
             Field::Mut(v) => std::mem::replace(&mut *v.borrow_mut(), val),
+        }
+    }
+}
+
+impl std::hash::Hash for Field {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self {
+            Field::Imm(v) => v.hash(state),
+            Field::Mut(v) => v.borrow().hash(state),
         }
     }
 }
@@ -325,7 +334,8 @@ impl PartialEq for Value {
             (Float(a), Float(b)) => a.eq(b),
             (String(a), String(b)) => Rc::ptr_eq(a, b) || a.eq(b),
             (Case(a), Case(b)) => Rc::ptr_eq(a, b) || a.0.eq(&b.0) && a.1.eq(&b.1),
-            (Record(a), Record(b)) => Rc::ptr_eq(a, b),
+            // In contrast to the original language, compare records by structural equality. (So they can be used as keys in maps.)
+            (Record(a), Record(b)) => Rc::ptr_eq(a, b) || a.eq(&b),
             (Callable(a), Callable(b)) => Rc::ptr_eq(a, b),
             (Env(a), Env(b)) => a == b,
             // we don't have a pointer-based hash for vectors and dicts, so we must compare by value
@@ -347,7 +357,14 @@ impl std::hash::Hash for Value {
             Value::Float(f) => f.to_bits().hash(state),
             Value::String(s) => s.hash(state),
             Value::Case(a) => a.0.hash(state),
-            Value::Record(a) => Rc::as_ptr(a).hash(state),
+            Value::Record(a) => {
+                let mut keys: Vec<_> = a.keys().cloned().collect();
+                keys.sort_unstable();
+                for k in keys {
+                    k.hash(state);
+                    a[&k].hash(state);
+                }
+            }
             Value::Callable(a) => Rc::as_ptr(a).hash(state),
             Value::Env(e) => e.hash(state),
             Value::Vect(v) if v.is_empty() => ().hash(state),
