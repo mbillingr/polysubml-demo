@@ -53,6 +53,19 @@ let opt = fun (type r) (p: <<parser r>>): (<<parser <<optional r>>>>) ->
             | `Ok {result; rest} -> `Ok {result=`Some result; rest}
             | `Err _ -> `Ok {result=`None{}; rest=chs};
 
+let prefixed = fun (type r) (left: <<parser any>>, right: <<parser r>>): (<<parser r>>) ->
+    map_result(
+        (fun (_, x) -> x), 
+        sequence(left, right));
+
+let suffixed = fun (type r) (left: <<parser r>>, right: <<parser any>>): (<<parser r>>) ->
+    map_result(
+        (fun (x, _) -> x), 
+        sequence(left, right));
+
+let delimited = fun (type r) (left: <<parser any>>, mid: <<parser r>>, right: <<parser any>>): (<<parser r>>) ->
+    prefixed(left, suffixed(mid, right));
+
 let seq = fun (type r) (ps: vec@(<<parser r>>)): (<<parser vec@r>>) ->
     fun chs -> begin
         let ps = vec.iter ps;
@@ -143,6 +156,11 @@ let seplist = fun (type r) (sep: <<parser any>>, p: <<parser r>>, min: int): (<<
 
 let epsilon = fun chs -> `Ok {result=""; rest=chs};
 
+let fail = fun chs -> 
+    match vec.peek_front chs with
+        | `Some c -> `Err c
+        | `None _ -> `Err "";
+
 
 let eof = fun chs ->
     match vec.peek_front chs with
@@ -191,6 +209,10 @@ let text = fun txt ->
         epsilon, 
         iter.map(char, str.chars txt));
 
+
+let one_of = fun chs -> iter.foldswap(alternative[r=str], fail, iter.map(char, str.chars chs));
+
+
 let num = map_result(
         (fun ds -> str.join("", vec.iter ds) |> int.from_str |> option.unwrap),
         repeat_min(digit, 1));
@@ -199,7 +221,7 @@ let num = map_result(
 {
     parse;
     map_result;
-    alt; alternative; not; opt; seq; sequence; repeat; repeat_min; seplist;
-    any_char; char; digit; eof; num; text; ws;
+    alt; alternative; delimited; not; opt; prefixed; seq; sequence; suffixed; repeat; repeat_min; seplist;
+    any_char; char; digit; eof; fail; num; one_of; text; ws;
     epsilon
 }

@@ -1,4 +1,5 @@
 import "iter.ml";
+import "option.ml";
 import "pbar.ml";
 
 let iterator = iter;
@@ -8,6 +9,7 @@ let type <<iter t>> = any -> [`Some t | `None any];
 let empty: (vec@never) = __vec_new {};
 let length = __vec_length;
 let peek = __vec_get;
+let poke = __vec_set;
 let peek_front = __vec_peek_front;
 let peek_back = __vec_peek_back;
 let push_front = __vec_push_front;
@@ -42,6 +44,11 @@ let get = fun (type a) (xs: (vec@a), i: int) : a ->
   match peek(xs, i) with
     | `None _ -> panic "index out of range"
     | `Some x -> x;
+
+let set = fun (type a) (xs: (vec@a), i: int, x: a) : (vec@a) ->
+  match poke(xs, i, x) with
+    | `None _ -> panic "index out of range"
+    | `Some ys -> ys;
 
 let foldl = fun (type a b) (f : (b*a)->b, init : b, lst : vec@a) : b ->
     iterator.fold(f, init, iter(lst));
@@ -97,6 +104,9 @@ let rec sort_by = fun (type a) (cmp : ((a*a)->bool), xs : vec@a) : (vec@a) ->
     else let (lhs, rhs) = split(xs, (__vec_length xs) / 2) in
         merge_sorted(cmp, sort_by(cmp, lhs), sort_by(cmp, rhs));
 
+let sort_by_key = fun (type a) (key : (a->int), xs : vec@a) : (vec@a) ->
+  sort_by((fun(a,b)-> key(a) < key(b)), xs);
+
 let sort_int = fun (xs : vec@int) : (vec@int) ->
     sort_by((fun(a,b)->a<b), xs);
 
@@ -113,6 +123,37 @@ let remove_at = fun (type a) (xs: (vec@a), i: int) : (vec@a) -> begin
   collect(xs_)
 end;
 
+let iter_loop = fun (type a) (xs: (vec@a)): (<<iter a>>) ->
+  let state = {mut it = iter xs} in
+    fun _ ->
+      match state.it {} with
+        | `Some x -> `Some x
+        | `None _ -> begin
+          state.it <- iter xs;
+          state.it {}
+        end;
+
+let iter_product2 = fun (type a b) (outer: <<iter a>>, ys: (vec@b)): (<<iter a*b>>) ->
+  let state = {mut x = outer {}; mut inner = iter ys} in
+    fun _ ->
+      loop match state.x with
+        | `None _ -> `Break `None {}
+        | `Some x -> begin
+          match state.inner {} with
+            | `Some y -> `Break `Some (x, y)
+            | `None _ -> begin
+              state.inner <- iter ys;
+              state.x <- outer {};
+              `Continue {}
+            end
+        end;
+
+let iter_product = fun (type a) (vs : <<iter vec@a>>): (<<iter vec@a>>) ->
+  //let fst = iter option.unwrap vs {} in
+  let fst = iterator.once #[] in
+    iterator.fold((fun (it, xs) -> iterator.map((fun (xs, x) -> push_back(xs, x)), iter_product2(it, xs))), fst, vs);
+
+
 let iter_pbar = fun (type a) (xs: (vec@a)): (<<iter a>>) ->
     let prog = pbar.new length xs in
     let it = iter xs in
@@ -121,8 +162,22 @@ let iter_pbar = fun (type a) (xs: (vec@a)): (<<iter a>>) ->
             | `Some x -> (pbar.step(prog, 1); `Some x)
             | `None _ -> (pbar.finish prog; `None {});
 
+let elementwise = fun (type a b c) (f: a*b->c, xs: vec@a, ys: vec@b) : (vec@c) -> 
+  if length xs != length ys then
+    panic "vectors must have same length for element-wise operations"
+  else
+    collect iterator.map(f, iterator.zip(iter xs, iter ys));
+
+
+let swap = fun (type a) (xs: vec@a, i1: int, i2: int): (vec@a) -> begin
+  let r1 = get(xs, i1);
+  let r2 = get(xs, i2);
+  set(set(xs, i1, r2), i2, r1)
+end;
+
 {
-    append; back; collect; collect_rev; empty; equal; filter; foldl; foldr; front; get; is_empty; iter; iter_pbar;
-    iter_rev; length; map; merge_sorted; peek; peek_back; peek_front; pop_back; pop_front; push_back;
-    push_front; remove_at; reverse; sort_by; sort_int; split
+    append; back; collect; collect_rev; elementwise; empty; equal; filter; foldl; foldr; front; 
+    get; is_empty; iter; iter_loop; iter_pbar; iter_product; iter_product2; iter_rev; length; map; merge_sorted; peek; peek_back; 
+    peek_front; pop_back; pop_front; push_back; push_front; remove_at; reverse; set; sort_by; 
+    sort_by_key; sort_int; split; swap
 }

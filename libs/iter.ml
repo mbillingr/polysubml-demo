@@ -1,3 +1,6 @@
+
+import "option.ml";
+
 (*
     An iterator is a function that ignores its argument and returns the next value on each call.
     Any interesting use will need to keep mutable state in the iterator's closure.
@@ -5,13 +8,20 @@
 
 let type <<iter t>> = any -> [`Some t | `None any];
 
+let empty = fun _ -> `None {};
+
+let once = fun (type a) (x: a): (<<iter a>>) ->
+    let state = {mut x = `Some x} in 
+        fun _ -> state.x <- `None {};
+
 let range = fun (start: int, stop: int): (<<iter int>>) ->
+    let dx = if stop < start then -1 else 1 in
     let state = {mut x = start} in
         fun _ ->
-            if state.x >= stop then
+            if state.x == stop then
                 `None {}
             else
-                `Some (state.x <- state.x + 1);
+                `Some (state.x <- state.x + dx);
 
 let range_inf = fun (start: int): (<<iter int>>) ->
     let state = {mut x = start} in
@@ -31,6 +41,10 @@ let fold = fun (type a b) (f: (b*a)->b, init: b, it: <<iter a>>) : b ->
             match it {} with
                 | `None _ -> `Break vars.acc
                 | `Some x -> `Continue (vars.acc <- f(vars.acc, x));
+
+let fold1 = fun (type a) (f: (a*a)->a, it: <<iter a>>) : a ->
+    let fst = option.unwrap it {} in
+        fold(f, fst, it);
 
 let scan = fun (type a b) (f: (b*a)->b, init: b, it: <<iter a>>) : (<<iter b>>) ->
     let vars = {mut acc=init} in
@@ -93,6 +107,9 @@ let filter_0 = fun (type a b) (f: a -> bool, it: <<iter (a*b)>>): (<<iter (a*b)>
 let filter_1 = fun (type a b) (f: b -> bool, it: <<iter (a*b)>>): (<<iter (a*b)>>) ->
     filter((fun(_,y)->f y), it);
 
+let filter_good = fun (type a) (it: <<iter [`Some a | `None any]>>): (<<iter a>>) ->
+    map(option.unwrap[a=a], filter(option.is_positive, it));
+
 let take_while = fun (type a) (f: a -> bool, it: <<iter a>>): (<<iter a>>) ->
     let state = {mut take=true} in
     fun z ->
@@ -150,6 +167,9 @@ let zip = fun (type a b) (ia: <<iter a>>, ib: <<iter b>>) : (<<iter (a*b)>>) ->
                 | `None _ -> `None {})
             | `None _ -> `None {};
 
+let zip4 = fun (type a b c d) (ia: <<iter a>>, ib: <<iter b>>, ic: <<iter c>>, id: <<iter d>>) : (<<iter (a*b*c*d)>>) ->
+    map((fun ((a, b), (c, d)) -> (a, b, c, d)), zip(zip(ia, ib), zip(ic, id)));
+
 let flatten = fun (type a) (it: <<iter <<iter a>>>>) : (<<iter a>>) ->
     let state = {mut inner=`None {}; mut outer=it}
     in fun _ ->
@@ -172,6 +192,19 @@ let chain = fun (type a) (ia: <<iter a>>, ib: <<iter a>>) : (<<iter a>>) ->
                 | `Some it -> (state.it <- it; it {})
                 | `None _ -> `None {})
             | `Some x -> `Some x;
+
+// alternatingly yield results from two iterators
+let splice = fun (type a) (ia: <<iter a>>, ib: <<iter a>>) : (<<iter a>>) ->
+    let state = {mut ia=ia; mut ib=ib}
+    in fun _ ->
+        match state.ia {} with
+            | `None _ -> state.ib {}
+            | `Some x -> begin 
+                let tmp = state.ia;
+                state.ia <- state.ib;
+                state.ib <- state.ia;
+                `Some x 
+            end;
 
 let enumerate = fun (type a) (it: <<iter a>>) : (<<iter (int*a)>>) ->
     zip(range_inf(0), it);
@@ -197,6 +230,8 @@ let find_idx = fun (it: <<iter bool>>): int ->
     count take_while((fun b -> b), it);
 
 {
-    all; any; chain; count; enumerate; filter; filter_0; filter_1; flatten; find_idx; fold; foldswap; for_each; 
-    map; map_0; map_1; map_inner; range; range_inf; repeat; scan; skip; sliding_pair; take; take_while; zip
+    all; any; chain; count; enumerate; empty; filter; filter_0; filter_1; filter_good; 
+    flatten; find_idx; fold; fold1; foldswap; for_each; map; map_0; map_1; map_inner;
+    once; range; range_inf; repeat; scan; skip; sliding_pair; splice; take; take_while; 
+    zip; zip4
 }
