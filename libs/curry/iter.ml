@@ -35,9 +35,13 @@ let type <<iter t>> = any -> [`Some t | `None any];
     map = fun (type a b) (f: a -> b) : ((<<iter a>>) -> (<<iter b>>)) ->
         fun it -> iter.map(f, it);
 
+    once = iter.once;
     range = iter.range;
     range_inf = iter.range_inf;
     repeat = iter.repeat;
+
+    select_by = fun (type a) (f: (a*a)->bool) : ((<<iter a>>) -> a) ->    
+        fun it -> iter.select_by(f, it);
 
     skip = fun (type a) (n: int) : ((<<iter a>>) -> (<<iter a>>)) ->
         fun it -> iter.skip(n, it);

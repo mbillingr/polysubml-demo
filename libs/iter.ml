@@ -46,6 +46,9 @@ let fold1 = fun (type a) (f: (a*a)->a, it: <<iter a>>) : a ->
     let fst = option.unwrap it {} in
         fold(f, fst, it);
 
+let select_by = fun (type a) (f: (a*a)->bool, it: <<iter a>>) : a ->    
+    fold1((fun (x,y) -> if f(y, x) then y else x), it);
+
 let scan = fun (type a b) (f: (b*a)->b, init: b, it: <<iter a>>) : (<<iter b>>) ->
     let vars = {mut acc=init} in
         fun _ ->
@@ -232,6 +235,6 @@ let find_idx = fun (it: <<iter bool>>): int ->
 {
     all; any; chain; count; enumerate; empty; filter; filter_0; filter_1; filter_good; 
     flatten; find_idx; fold; fold1; foldswap; for_each; map; map_0; map_1; map_inner;
-    once; range; range_inf; repeat; scan; skip; sliding_pair; splice; take; take_while; 
-    zip; zip4
+    once; range; range_inf; repeat; scan; select_by; skip; sliding_pair; splice; take; 
+    take_while; zip; zip4
 }
